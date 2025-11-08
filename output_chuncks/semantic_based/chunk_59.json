@@ -1,0 +1,10 @@
+{
+    "content": "Los grafos se representan con listas de adyacencia o matrices, cada uno optimizado para diferentes operaciones.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 59,
+        "start_sentence_index": 40,
+        "end_sentence_index": 40
+    }
+}

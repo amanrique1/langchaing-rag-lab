@@ -1,0 +1,10 @@
+{
+    "content": "Los logs de auditor\u00eda deben capturar todos los accesos y cambios cr\u00edticos, manteni\u00e9ndose inmutables y monitoreados por sistemas SIEM.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 45,
+        "start_sentence_index": 25,
+        "end_sentence_index": 25
+    }
+}

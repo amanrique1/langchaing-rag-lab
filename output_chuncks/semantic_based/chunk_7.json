@@ -1,0 +1,10 @@
+{
+    "content": "Refactorizar manteniendo tests verdes\n\n2.2.2 Continuous Testing\n\nAUTOMATIZACI\u00d3N REQUERIDA: - Tests ejecutados en cada commit - Reporte autom\u00e1tico de coverage - Notificaciones de fallos v\u00eda Slack/email\n\n3.",
+    "metadata": {
+        "source": "data/development_policies.md",
+        "doc_index": 1,
+        "chunk_index": 7,
+        "start_sentence_index": 7,
+        "end_sentence_index": 7
+    }
+}

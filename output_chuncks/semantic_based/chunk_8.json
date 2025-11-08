@@ -1,0 +1,10 @@
+{
+    "content": "POL\u00cdTICA DE SEGURIDAD EN EL C\u00d3DIGO\n\n3.1 Manejo de Credenciales\n\n3.1.1 Prohibiciones Absolutas\n\nTERMINANTEMENTE PROHIBIDO: - Hardcodear passwords, API keys o tokens - Commitear archivos .env con datos sensibles - Usar credenciales de desarrollo en producci\u00f3n - Compartir credenciales por medios no seguros\n\n3.1.2 Pr\u00e1cticas Obligatorias\n\nDEBE IMPLEMENTARSE: - Variables de entorno para configuraci\u00f3n - Gestores de secretos (AWS Secrets Manager, HashiCorp Vault) - Rotaci\u00f3n peri\u00f3dica de credenciales (cada 90 d\u00edas) - Cifrado de datos sensibles en reposo\n\n3.2 An\u00e1lisis de Vulnerabilidades\n\n3.2.1 Herramientas Obligatorias\n\nINTEGRACI\u00d3N REQUERIDA en CI/CD: - SonarQube para an\u00e1lisis de c\u00f3digo est\u00e1tico - OWASP Dependency Check para vulnerabilidades - ESLint Security Plugin para JavaScript - Bandit para Python\n\n3.2.2 Umbrales de Seguridad\n\nCRITERIOS DE BLOQUEO: - Vulnerabilidades CRITICAL: 0 permitidas - Vulnerabilidades HIGH: M\u00e1ximo 2 con plan de remediaci\u00f3n - Vulnerabilidades MEDIUM: M\u00e1ximo 10 con seguimiento\n\n4.",
+    "metadata": {
+        "source": "data/development_policies.md",
+        "doc_index": 1,
+        "chunk_index": 8,
+        "start_sentence_index": 8,
+        "end_sentence_index": 8
+    }
+}

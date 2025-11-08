@@ -1,0 +1,10 @@
+{
+    "content": "Bajo Acoplamiento, Alta Cohesi\u00f3n\n\nBajo Acoplamiento: Los m\u00f3dulos deben depender m\u00ednimamente entre s\u00ed\n\nAlta Cohesi\u00f3n: Los elementos dentro de un m\u00f3dulo deben trabajar juntos hacia un objetivo com\u00fan\n\n3.",
+    "metadata": {
+        "source": "data/software_architecture_guide.md",
+        "doc_index": 3,
+        "chunk_index": 80,
+        "start_sentence_index": 5,
+        "end_sentence_index": 5
+    }
+}

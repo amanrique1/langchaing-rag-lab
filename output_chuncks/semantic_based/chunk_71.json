@@ -1,0 +1,10 @@
+{
+    "content": "Decision trees dividen datos recursivamente, random forests combinan m\u00faltiples \u00e1rboles para mayor robustez.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 71,
+        "start_sentence_index": 53,
+        "end_sentence_index": 53
+    }
+}

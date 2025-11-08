@@ -1,0 +1,10 @@
+{
+    "content": "Gu\u00eda de Troubleshooting - Problemas Comunes\n\nProblemas de Performance\n\nPROBLEMA: Alta latencia en respuestas de API\n\nS\u00edntomas: - Tiempos de respuesta > 2 segundos - Timeouts frecuentes - Quejas de usuarios sobre lentitud\n\nDiagn\u00f3stico: 1.",
+    "metadata": {
+        "source": "data/troubleshooting_guide.md",
+        "doc_index": 4,
+        "chunk_index": 87,
+        "start_sentence_index": 0,
+        "end_sentence_index": 0
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "content": "El aislamiento de transacciones previene problemas como dirty reads y phantom reads.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 35,
+        "start_sentence_index": 14,
+        "end_sentence_index": 14
+    }
+}

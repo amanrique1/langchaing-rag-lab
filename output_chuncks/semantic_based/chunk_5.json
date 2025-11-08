@@ -1,0 +1,10 @@
+{
+    "content": "POL\u00cdTICA DE TESTING\n\n2.1 Niveles de Testing Obligatorios\n\n2.1.1 Unit Tests\n\nCOBERTURA M\u00cdNIMA: 80% para todas las funciones HERRAMIENTAS: Jest, PyTest, JUnit (seg\u00fan tecnolog\u00eda) RESPONSABLE: Desarrollador que implementa la funcionalidad\n\n2.1.2 Integration Tests\n\nFRECUENCIA: Antes de cada merge a develop ALCANCE: Interacciones entre m\u00f3dulos RESPONSABLE: Equipo de desarrollo\n\n2.1.3 End-to-End Tests\n\nFRECUENCIA: Antes de cada release HERRAMIENTAS: Cypress, Selenium, Playwright RESPONSABLE: Equipo de QA\n\n2.2 Procedimientos de Testing\n\n2.2.1 Test-Driven Development (TDD)\n\nOBLIGATORIO para funcionalidades cr\u00edticas: 1.",
+    "metadata": {
+        "source": "data/development_policies.md",
+        "doc_index": 1,
+        "chunk_index": 5,
+        "start_sentence_index": 4,
+        "end_sentence_index": 4
+    }
+}

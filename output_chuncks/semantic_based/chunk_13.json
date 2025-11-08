@@ -1,0 +1,10 @@
+{
+    "content": "CUMPLIMIENTO Y AUDITOR\u00cdA\n\n5.1 Monitoreo de Cumplimiento\n\nM\u00c9TRICAS RASTREADAS: - Porcentaje de PRs con revisiones requeridas - Tiempo promedio de resoluci\u00f3n de vulnerabilidades - Adherencia a convenciones de nomenclatura - Coverage de tests por proyecto\n\n5.2 Auditor\u00edas Peri\u00f3dicas\n\nFRECUENCIA: Trimestral ALCANCE: Revisi\u00f3n de cumplimiento de pol\u00edticas RESPONSABLE: Arquitecto Principal y Tech Lead\n\n5.3 Sanciones por Incumplimiento\n\nESCALAMIENTO PROGRESIVO: 1.",
+    "metadata": {
+        "source": "data/development_policies.md",
+        "doc_index": 1,
+        "chunk_index": 13,
+        "start_sentence_index": 14,
+        "end_sentence_index": 14
+    }
+}

@@ -1,0 +1,10 @@
+{
+    "content": "El principio de menor privilegio limita accesos a lo m\u00ednimo necesario para cada rol.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 42,
+        "start_sentence_index": 21,
+        "end_sentence_index": 21
+    }
+}

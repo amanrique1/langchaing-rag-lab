@@ -1,0 +1,10 @@
+{
+    "content": "Utilizan m\u00e9todos HTTP est\u00e1ndar como GET, POST, PUT y DELETE para operaciones CRUD.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 23,
+        "start_sentence_index": 1,
+        "end_sentence_index": 1
+    }
+}

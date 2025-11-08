@@ -1,0 +1,11 @@
+.env
+output_chunks/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+*.log
+.DS_Store
+.vscode/

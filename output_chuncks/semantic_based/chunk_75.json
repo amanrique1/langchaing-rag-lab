@@ -1,0 +1,10 @@
+{
+    "content": "Deep learning utiliza redes profundas para reconocimiento de patrones complejos. Computer vision procesa im\u00e1genes con convolutional neural networks. Natural language processing analiza texto con transformers y attention mechanisms.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 75,
+        "start_sentence_index": 57,
+        "end_sentence_index": 59
+    }
+}

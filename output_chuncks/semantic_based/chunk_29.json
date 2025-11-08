@@ -1,0 +1,10 @@
+{
+    "content": "El versionado de APIs asegura compatibilidad hacia atr\u00e1s, implement\u00e1ndose com\u00fanmente en la URL como /v1/ o /v2/.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 29,
+        "start_sentence_index": 8,
+        "end_sentence_index": 8
+    }
+}

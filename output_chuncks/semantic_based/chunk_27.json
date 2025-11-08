@@ -1,0 +1,10 @@
+{
+    "content": "La autenticaci\u00f3n en APIs modernas t\u00edpicamente utiliza JWT tokens o API keys. Los tokens JWT contienen informaci\u00f3n del usuario codificada y firmada, permitiendo verificaci\u00f3n sin consultar la base de datos.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 27,
+        "start_sentence_index": 5,
+        "end_sentence_index": 6
+    }
+}

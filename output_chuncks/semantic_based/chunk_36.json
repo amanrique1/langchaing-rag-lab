@@ -1,0 +1,10 @@
+{
+    "content": "Los stored procedures encapsulan l\u00f3gica de negocio en la base de datos, mejorando performance pero reduciendo portabilidad.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 36,
+        "start_sentence_index": 15,
+        "end_sentence_index": 15
+    }
+}

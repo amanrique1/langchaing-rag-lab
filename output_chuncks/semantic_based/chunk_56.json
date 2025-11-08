@@ -1,0 +1,10 @@
+{
+    "content": "Los \u00e1rboles binarios de b\u00fasqueda permiten operaciones O(log n) cuando est\u00e1n balanceados, degrad\u00e1ndose a O(n) si se vuelven lineales.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 56,
+        "start_sentence_index": 37,
+        "end_sentence_index": 37
+    }
+}

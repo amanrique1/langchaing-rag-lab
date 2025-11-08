@@ -1,0 +1,10 @@
+{
+    "content": "Las colas de prioridad implementadas con heaps soportan insert y extract-min en O(log n).",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 58,
+        "start_sentence_index": 39,
+        "end_sentence_index": 39
+    }
+}

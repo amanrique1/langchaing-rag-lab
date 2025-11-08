@@ -1,0 +1,10 @@
+{
+    "content": "USER nextjs\n\nEXPOSE 3000\n\n# Health check\nHEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:3000/health || exit 1\n\nCMD [\"node\", \"app.js\"]\n\nSoluci\u00f3n 2: Configurar Docker Compose con limits\n\nversion: '3.8'\nservices:\n  app:\n    build: .",
+    "metadata": {
+        "source": "data/troubleshooting_guide.md",
+        "doc_index": 4,
+        "chunk_index": 94,
+        "start_sentence_index": 8,
+        "end_sentence_index": 8
+    }
+}

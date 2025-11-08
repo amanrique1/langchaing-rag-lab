@@ -1,0 +1,10 @@
+{
+    "content": "Inteligencia Artificial y Machine Learning\n\nMachine learning transforma datos en modelos predictivos mediante algoritmos de aprendizaje. Supervised learning usa datos etiquetados para clasificaci\u00f3n y regresi\u00f3n.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 70,
+        "start_sentence_index": 51,
+        "end_sentence_index": 52
+    }
+}

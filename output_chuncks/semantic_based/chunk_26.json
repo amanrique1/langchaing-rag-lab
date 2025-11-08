@@ -1,0 +1,10 @@
+{
+    "content": "Los c\u00f3digos de respuesta HTTP proporcionan informaci\u00f3n clara sobre el resultado de cada operaci\u00f3n, desde 200 para \u00e9xito hasta 404 para recursos no encontrados.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 26,
+        "start_sentence_index": 4,
+        "end_sentence_index": 4
+    }
+}

@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "langchain-rag-lab"
+version = "0.1.0"
+description = "Un laboratorio de IA conversacional con Gemini y Ollama"
+authors = ["Andres Manrique <andress0199@outlook.com>"]
+readme = "README.md"
+packages = [
+    {include = "application", from = "src"},
+    {include = "domain", from = "src"},
+    {include = "infrastructure", from = "src"},
+    {include = "tests"},
+]
+
+[tool.poetry.scripts]
+cli = "src.infrastructure.cli.main:main"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langchain = "^1.0.3"
+langchain-core = "^1.0.2"
+langchain-community = "^0.4.1"
+langchain-chroma = "^1.0.0"
+langchain-google-genai = "^3.0.0"
+langchain-text-splitters = "^1.0.0"
+chromadb = "^1.0.20"
+unstructured = "^0.18.15"
+python-dotenv = "^1.2.1"
+markdown = "^3.9"
+ragas = "^0.3.8"
+datasets = "^4.3.0"
+jupytext = "^1.18.1"
+scikit-learn = "^1.7.2"
+nltk = "^3.9.2"
+
+
+
+[tool.poetry.group.lab.dependencies]
+jupyter = "^1.1.1"
+ipykernel = "^7.0.1"
+
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+pytest-mock = "^3.15.1"
+ruff = "^0.5.5"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

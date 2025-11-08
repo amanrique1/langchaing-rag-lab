@@ -1,0 +1,10 @@
+{
+    "content": "Los contenedores comparten el kernel del host, siendo m\u00e1s ligeros que m\u00e1quinas virtuales completas.",
+    "metadata": {
+        "source": "data/multi_theme_descriptions.md",
+        "doc_index": 2,
+        "chunk_index": 62,
+        "start_sentence_index": 43,
+        "end_sentence_index": 43
+    }
+}
