@@ -4,11 +4,12 @@ from application.ports.chunk_store import ChunkStore
 from src.domain.services.chunking_service import ChunkingService
 from src.domain.strategies.chunking_strategy import ChunkingStrategy
 from src.domain.strategies.length_based_chunking import LengthBasedChunkingStrategy
-from src.domain.strategies.structure_based_chunking import StructureBasedChunkingStrategy
+from src.domain.strategies.structure_based_chunking import (
+    StructureBasedChunkingStrategy,
+)
 from src.domain.strategies.semantic_chunking import SemanticChunkingStrategy
 from src.domain.models.chunk import Chunk
 from src.domain.models.enums import DocumentLoaderMode
-
 
 
 class ChunkingUseCase:
@@ -39,6 +40,5 @@ class ChunkingUseCase:
         chunking_service = ChunkingService(strategy)
 
         chunks = chunking_service.chunk_documents(documents)
-        for chunk in chunks:
-            self.chunk_store.add(chunk)
+        self.chunk_store.save(chunks)
         return chunks

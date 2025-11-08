@@ -59,12 +59,8 @@ def run_chunking(args, chunk_store: ChunkStore):
     chunks = use_case.execute(
         args.source, args.strategy, strategy_config, loader_mode=args.loader_mode
     )
-
-    if isinstance(chunk_store, FileSystemChunkStore):
-        chunk_store.save(chunks)
-    elif isinstance(chunk_store, ChromaChunkStore):
-        for chunk in chunks:
-            chunk_store.add(chunk)
+    
+    chunk_store.save(chunks)
 
     print(f"Successfully processed {len(chunks)} documents.")
 
@@ -74,16 +70,19 @@ def main():
     parser = argparse.ArgumentParser(
         description="Chunk documents using different strategies."
     )
+
+    # Add the new 'task' argument
+    parser.add_argument(
+        "task",
+        help="Task to perform.",
+        choices=["save", "search", "delete", "clean"],
+    )
+    
     setup_common_arguments(parser)
     parser.add_argument(
         "--local",
         action="store_true",
         help="Store chunks locally in the file system.",
-    )
-    parser.add_argument(
-        "--clean",
-        action="store_true",
-        help="Clean the chunk store before processing.",
     )
     parser.add_argument(
         "--output-dir",
@@ -103,15 +102,20 @@ def main():
     else:
         chunk_store = ChromaChunkStore(args.collection_name)
 
-    if args.clean:
+    if args.task == "clean":
         chunk_store.clear()
-        if isinstance(chunk_store, ChromaChunkStore):
-            print(f"Successfully cleared collection: {args.collection_name}")
+        if args.local:
+            print(f"Cleared local chunk store at {args.output_dir}.")
+    elif args.task == "save":
+        if args.source:
+            run_chunking(args, chunk_store)
         else:
-            print(f"Successfully cleared output directory: {args.output_dir}")
-
-    if args.source:
-        run_chunking(args, chunk_store)
+            print("Error: 'source' argument is required for the 'save' task.")
+    # Add placeholders for other tasks
+    elif args.task == "search":
+        print("Search functionality not yet implemented.")
+    elif args.task == "delete":
+        print("Delete functionality not yet implemented.")
 
 
 if __name__ == "__main__":

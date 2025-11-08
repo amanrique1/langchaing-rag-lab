@@ -6,8 +6,11 @@ from langchain_core.documents import Document
 from src.application.ports.chunk_store import ChunkStore
 from src.domain.models.chunk import Chunk
 
+
 class ChromaChunkStore(ChunkStore):
-    def __init__(self, collection_name: str = "rag_docs", persist_directory: str = "./chroma_db"):
+    def __init__(
+        self, collection_name: str = "rag_docs", persist_directory: str = "./chroma_db"
+    ):
         self.collection_name = collection_name
         self.persist_directory = persist_directory
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
@@ -17,18 +20,37 @@ class ChromaChunkStore(ChunkStore):
             embedding_function=self.embeddings,
         )
 
-    def add(self, chunk: Chunk):
+    def save(self, chunks: list[Chunk]):
         """Adds a single chunk to the vector store."""
+        documents = []
+        chunk_ids = []
+        for chunk in chunks:
+            chunk_id = f"{chunk.metadata.get('source', 'doc')}_{chunk.metadata.get('chunk_index', 0)}"
+            document = Document(page_content=chunk.content, metadata=chunk.metadata)
+            documents.append(document)
+            chunk_ids.append(chunk_id)
 
-        chunk_id = f"{chunk.metadata.get('source', 'doc')}_{chunk.metadata.get('chunk_index', 0)}"
-        document = Document(page_content=chunk.content, metadata=chunk.metadata)
+        self.vector_store.add_documents(documents=documents, ids=chunk_ids)
 
-        self.vector_store.add_documents(documents=[document], ids=[chunk_id])
-
-    def get(self, chunk_id: str) -> Chunk | None:
+    def get(
+        self,
+        chunk_id: str,
+        where: dict = None,
+        limit: int = None,
+        offset: int = None,
+        where_document: dict = None,
+        include: list = None,
+    ) -> Chunk | None:
         """Retrieves a single chunk by its ID."""
 
-        results = self.vector_store.get(ids=[chunk_id])
+        results = self.vector_store.get(
+            ids=[chunk_id],
+            where=where,
+            limit=limit,
+            offset=offset,
+            where_document=where_document,
+            include=include,
+        )
         if results and results["ids"]:
             return Chunk(
                 content=results["documents"][0],
@@ -36,15 +58,26 @@ class ChromaChunkStore(ChunkStore):
             )
         return None
 
-    def delete(self, chunk_id: str):
+    def delete(self, chunk_id: str, where: dict = None, where_document: dict = None):
         """Deletes a single chunk by its ID."""
-        self.vector_store.delete(ids=[chunk_id])
+        self.vector_store.delete(
+            ids=[chunk_id], where=where, where_document=where_document
+        )
 
-    def search(self, query_embedding: list[float], top_k: int = 5) -> list[Chunk]:
+    def search(
+        self,
+        query_embedding: list[float],
+        top_k: int = 5,
+        where: dict = None,
+        where_document: dict = None,
+    ) -> list[Chunk]:
         """Searches for similar chunks using a query embedding."""
 
         docs = self.vector_store.similarity_search_by_vector(
-            embedding=query_embedding, k=top_k
+            embedding=query_embedding,
+            k=top_k,
+            where=where,
+            where_document=where_document,
         )
 
         return [Chunk(content=doc.page_content, metadata=doc.metadata) for doc in docs]

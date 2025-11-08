@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List
 from src.domain.models.chunk import Chunk
 
 
 class ChunkStore(ABC):
     @abstractmethod
-    def add(self, chunk: Chunk):
+    def save(self, chunks: list[Chunk]):
         pass
 
     @abstractmethod
@@ -18,4 +17,8 @@ class ChunkStore(ABC):
 
     @abstractmethod
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[Chunk]:
+        pass
+
+    @abstractmethod
+    def clear(self):
         pass

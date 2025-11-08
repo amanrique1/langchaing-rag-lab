@@ -10,17 +10,20 @@ class FileSystemChunkStore(ChunkStore):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def add(self, chunk: Chunk):
-        file_path = self.output_dir / f"chunk_{chunk.metadata.get('chunk_index', 0)}.json"
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "content": chunk.content,
-                    "metadata": chunk.metadata,
-                },
-                f,
-                indent=4,
+    def save(self, chunks: list[Chunk]):
+        for chunk in chunks:
+            file_path = (
+                self.output_dir / f"chunk_{chunk.metadata.get('chunk_index', 0)}.json"
             )
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "content": chunk.content,
+                        "metadata": chunk.metadata,
+                    },
+                    f,
+                    indent=4,
+                )
 
     def get(self, chunk_id: str) -> Chunk | None:
         return None
@@ -31,6 +34,6 @@ class FileSystemChunkStore(ChunkStore):
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[Chunk]:
         return []
 
-    def save(self, chunks: List[Chunk]):
-        for chunk in chunks:
-            self.add(chunk)
+    def clear(self):
+        pass
+

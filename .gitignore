@@ -1,6 +1,7 @@
 .env
 output_chunks/
 chroma_db/
+test_chroma_db/
 __pycache__/
 *.pyc
 *.pyo
@@ -10,3 +11,5 @@ __pycache__/
 *.log
 .DS_Store
 .vscode/
+.ruff_cache/
+.pytest_cache/
