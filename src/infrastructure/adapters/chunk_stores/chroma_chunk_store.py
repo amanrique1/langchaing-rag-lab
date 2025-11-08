@@ -1,7 +1,8 @@
 import os
 import shutil
-import chromadb
+from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_core.documents import Document
 from src.application.ports.chunk_store import ChunkStore
 from src.domain.models.chunk import Chunk
 
@@ -10,24 +11,25 @@ class ChromaChunkStore(ChunkStore):
         self.collection_name = collection_name
         self.persist_directory = persist_directory
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-        self.client = chromadb.PersistentClient(path=self.persist_directory)
-        self.collection = self.client.get_or_create_collection(name=self.collection_name)
+        self.vector_store = Chroma(
+            collection_name=self.collection_name,
+            persist_directory=self.persist_directory,
+            embedding_function=self.embeddings,
+        )
 
     def add(self, chunk: Chunk):
         """Adds a single chunk to the vector store."""
 
         chunk_id = f"{chunk.metadata.get('source', 'doc')}_{chunk.metadata.get('chunk_index', 0)}"
+        document = Document(page_content=chunk.content, metadata=chunk.metadata)
 
-        self.collection.add(
-            embeddings=[self.embeddings.embed_query(chunk.content)],
-            documents=[chunk.content],
-            metadatas=[chunk.metadata],
-            ids=[chunk_id]
-        )
+        self.vector_store.add_documents(documents=[document], ids=[chunk_id])
 
     def get(self, chunk_id: str) -> Chunk | None:
-        results = self.collection.get(ids=[chunk_id])
-        if results["ids"]:
+        """Retrieves a single chunk by its ID."""
+
+        results = self.vector_store.get(ids=[chunk_id])
+        if results and results["ids"]:
             return Chunk(
                 content=results["documents"][0],
                 metadata=results["metadatas"][0],
@@ -35,26 +37,32 @@ class ChromaChunkStore(ChunkStore):
         return None
 
     def delete(self, chunk_id: str):
-        self.collection.delete(ids=[chunk_id])
+        """Deletes a single chunk by its ID."""
+        self.vector_store.delete(ids=[chunk_id])
 
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[Chunk]:
-        results = self.collection.query(query_embeddings=[query_embedding], n_results=top_k)
+        """Searches for similar chunks using a query embedding."""
 
-        chunks = []
-        if results:
-            for content, metadata in zip(results["documents"][0], results["metadatas"][0]):
-                chunks.append(Chunk(content=content, metadata=metadata))
+        docs = self.vector_store.similarity_search_by_vector(
+            embedding=query_embedding, k=top_k
+        )
 
-        return chunks
+        return [Chunk(content=doc.page_content, metadata=doc.metadata) for doc in docs]
 
     def clear(self):
         """Clears a specific collection or the entire database."""
+
         if self.collection_name:
             try:
-                self.client.delete_collection(name=self.collection_name)
-                self.collection = self.client.get_or_create_collection(name=self.collection_name)
-            except ValueError:
-                # Collection may not exist, which is fine.
+                self.vector_store.delete_collection()
+                # Recreate the collection after deletion
+                self.vector_store = Chroma(
+                    collection_name=self.collection_name,
+                    persist_directory=self.persist_directory,
+                    embedding_function=self.embeddings,
+                )
+            except Exception:
+                # Handle cases where the collection might not exist
                 pass
         else:
             if os.path.exists(self.persist_directory):
