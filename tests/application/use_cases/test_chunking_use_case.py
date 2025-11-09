@@ -15,17 +15,12 @@ def mock_chunk_store():
 
 
 @pytest.fixture
-def chunking_use_case(mock_document_loader, mock_chunk_store):
-    return ChunkingUseCase(
-        document_loader=mock_document_loader, chunk_store=mock_chunk_store
-    )
+def chunking_use_case(mock_document_loader):
+    return ChunkingUseCase(document_loader=mock_document_loader)
 
 
-def test_chunking_use_case_execute(
-    chunking_use_case, mock_document_loader, mock_chunk_store
-):
+def test_chunking_use_case_execute(chunking_use_case, mock_document_loader):
     mock_document_loader.load.return_value = [Document(content="test", metadata={})]
-    mock_chunk_store.save.return_value = None
 
     strategy_name = "length_based"
     strategy_config = {"mode": "character", "chunk_size": 100, "chunk_overlap": 20}
@@ -39,4 +34,3 @@ def test_chunking_use_case_execute(
 
     mock_document_loader.load.assert_called_once()
     assert len(chunks) > 0
-    mock_chunk_store.save.assert_called()

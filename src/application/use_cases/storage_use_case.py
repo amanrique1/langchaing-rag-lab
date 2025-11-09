@@ -21,7 +21,7 @@ class StorageUseCase:
     def save(self, chunks: List[Chunk]) -> None:
         self.chunk_store.save(chunks)
 
-    async def search(self, query: str, top_k: int = 5) -> List[Chunk]:
+    def search(self, query: str, top_k: int = 5) -> List[Chunk]:
         # Generate embedding for the query
         query_embedding = self.embeddings.embed_query(query)
 

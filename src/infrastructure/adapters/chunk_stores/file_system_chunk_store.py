@@ -5,10 +5,11 @@ import shutil
 from application.ports.chunk_store import ChunkStore
 from domain.models.chunk import Chunk
 
+DEFAULT_OUTPUT_DIR = "./output_chunks"
 
 class FileSystemChunkStore(ChunkStore):
-    def __init__(self, output_dir: str):
-        self.output_dir = Path(output_dir)
+    def __init__(self, output_dir: str = None):
+        self.output_dir = Path(output_dir or DEFAULT_OUTPUT_DIR)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def save(self, chunks: list[Chunk]):

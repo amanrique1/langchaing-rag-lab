@@ -8,7 +8,7 @@ class TalkUseCase:
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI( model = "gemini-2.5-flash", temperature = 0.0 )
 
-    async def execute(self, query: str, relevant_chunks: List[Chunk]) -> str:
+    def execute(self, query: str, relevant_chunks: List[Chunk]) -> str:
         context = "\n\n".join([chunk.content for chunk in relevant_chunks])
 
         if not context:
@@ -23,5 +23,5 @@ class TalkUseCase:
             ),
         ]
 
-        response = await self.llm.invoke(messages)
+        response = self.llm.invoke(messages)
         return response.content

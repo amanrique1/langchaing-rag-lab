@@ -6,10 +6,11 @@ from langchain_core.documents import Document
 from src.application.ports.chunk_store import ChunkStore
 from src.domain.models.chunk import Chunk
 
+DEFAULT_COLLECTION_NAME = "rag_docs"
 
 class ChromaChunkStore(ChunkStore):
-    def __init__(self, collection_name: str = "rag_docs"):
-        self.collection_name = collection_name
+    def __init__(self, collection_name: str = None):
+        self.collection_name = collection_name or DEFAULT_COLLECTION_NAME
         self.persist_directory = "./chroma_db"
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         self.vector_store = Chroma(
@@ -66,16 +67,14 @@ class ChromaChunkStore(ChunkStore):
         self,
         query_embedding: list[float],
         top_k: int = 5,
-        where: dict = None,
-        where_document: dict = None,
+        filter: dict = None
     ) -> list[Chunk]:
         """Searches for similar chunks using a query embedding."""
 
         docs = self.vector_store.similarity_search_by_vector(
             embedding=query_embedding,
             k=top_k,
-            where=where,
-            where_document=where_document,
+            filter=filter
         )
 
         return [Chunk(content=doc.page_content, metadata=doc.metadata) for doc in docs]

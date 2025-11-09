@@ -238,7 +238,7 @@ CHROMA_PERSIST_DIRECTORY=./chroma_db
 
 ---
 
-## Usage
+## Command-Line Interface (CLI)
 
 The project uses a **task-based CLI** for different operations.
 
@@ -273,6 +273,23 @@ poetry run cli [TASK] [SOURCE] [STRATEGY] [OPTIONS]
 | `--local` | Store chunks locally in the file system | `false` (uses ChromaDB) |
 | `--output-dir` | Directory to save chunks (with `--local`) | `output_chunks` |
 | `--collection-name` | ChromaDB collection name | `default_collection` |
+| `--clean` | Clean the collection before saving new chunks | `false` |
+
+### Argument Validation and Rules
+
+The CLI includes safeguards to ensure that commands are run with the correct parameters.
+
+1.  **Task-Specific Requirements**:
+    *   `save`: Requires `SOURCE` and `STRATEGY` arguments.
+    *   `search`, `talk`: Requires the `--query` argument.
+
+2.  **Storage Logic**:
+    *   If `--local` is used, chunks are saved to the local file system. Use `--output-dir` to specify the location.
+    *   If `--local` is **not** used, chunks are saved to ChromaDB. Use `--collection-name` to specify the collection.
+    *   You cannot use `--output-dir` and `--collection-name` together. The CLI will raise an error if you do.
+
+3.  **Strategy-Specific Configuration**:
+    *   When using the `length_based` strategy, the `--config` JSON **must** contain `chunk_size` and `chunk_overlap`.
 
 ---
 
@@ -284,8 +301,8 @@ The `--config` option accepts a JSON string to customize the behavior of each st
 
 | Parameter | Type | Description | Default | Example |
 | :--- | :--- | :--- | :--- | :--- |
-| `chunk_size` | int | Max size of each chunk | `1000` | `1000` |
-| `chunk_overlap` | int | Overlap between chunks | `200` | `200` |
+| `chunk_size` | int | **Required**. Max size of each chunk | `1000` | `1000` |
+| `chunk_overlap` | int | **Required**. Overlap between chunks | `200` | `200` |
 | `mode` | string | Splitting mode: `character` or `token` | `character` | `"character"` |
 
 **Example Config**:
