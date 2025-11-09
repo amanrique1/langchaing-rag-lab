@@ -1,22 +1,18 @@
 import json
 import argparse
+import asyncio
 from dotenv import load_dotenv
 from application.use_cases.chunking_use_case import ChunkingUseCase
+from application.use_cases.storage_use_case import StorageUseCase
+from application.use_cases.talk_use_case import TalkUseCase
 from infrastructure.adapters.document_loaders.markdown_loader import (
     MarkdownDocumentLoader,
 )
-from infrastructure.adapters.chunk_stores.file_system_chunk_store import (
-    FileSystemChunkStore,
-)
-from application.ports.chunk_store import ChunkStore
 
 from domain.models.enums import (
     LengthBasedChunkingMode,
     SemanticChunkingThresholdType,
-    DocumentLoaderMode,
-)
-from infrastructure.adapters.chunk_stores.chroma_chunk_store import (
-    ChromaChunkStore,
+    StorageType,
 )
 
 
@@ -36,16 +32,22 @@ def setup_common_arguments(parser):
         default="{}",
     )
     parser.add_argument(
-        "--loader-mode",
-        help="Document loader mode.",
-        choices=[mode.value for mode in DocumentLoaderMode],
-        default=DocumentLoaderMode.SINGLE.value,
+        "--query",
+        help="Query string for searching chunks.",
+    )
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        help="Number of top relevant chunks to retrieve.",
+        default=5,
     )
 
 
-def run_chunking(args, chunk_store: ChunkStore):
+def run_chunking(args, store_type: StorageType):
     document_loader = MarkdownDocumentLoader()
-    use_case = ChunkingUseCase(document_loader, chunk_store)
+    chunking_use_case = ChunkingUseCase(document_loader)
+    output = args.output_dir if args.local else args.collection_name
+    storage_use_case = StorageUseCase(store_type, output)
     strategy_config = json.loads(args.config)
 
     if args.strategy == "length_based" and "mode" in strategy_config:
@@ -56,14 +58,27 @@ def run_chunking(args, chunk_store: ChunkStore):
             strategy_config["breakpoint_threshold_type"]
         )
 
-    chunks = use_case.execute(
-        args.source, args.strategy, strategy_config, loader_mode=args.loader_mode
-    )
-    
-    chunk_store.save(chunks)
+    chunks = chunking_use_case.execute(
+        args.source, args.strategy, strategy_config)
+    storage_use_case.save(chunks)
 
     print(f"Successfully processed {len(chunks)} documents.")
 
+
+async def run_talk(args, store_type: StorageType):
+    storage_use_case = StorageUseCase(store_type)
+    talk_use_case = TalkUseCase()
+
+    print(f"Question: {args.query}")
+
+    relevant_chunks = await storage_use_case.search(args.query, args.top_k)
+    answer = await talk_use_case.execute(args.query, relevant_chunks)
+
+    print(f"\nAnswer: {answer}")
+
+def clean(storage_type: StorageType, output_loc: str):
+    storage = StorageUseCase(storage_type, output_loc)
+    storage.clear()
 
 def main():
     load_dotenv()
@@ -75,9 +90,9 @@ def main():
     parser.add_argument(
         "task",
         help="Task to perform.",
-        choices=["save", "search", "delete", "clean"],
+        choices=["save", "search", "delete", "clean", "talk"],
     )
-    
+
     setup_common_arguments(parser)
     parser.add_argument(
         "--local",
@@ -94,26 +109,50 @@ def main():
         help="Name of the ChromaDB collection.",
         default="default_collection",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Clean the collection before saving new chunks.",
+    )
 
     args = parser.parse_args()
 
-    if args.local:
-        chunk_store = FileSystemChunkStore(args.output_dir)
-    else:
-        chunk_store = ChromaChunkStore(args.collection_name)
-
+    store_type = StorageType.LOCAL if args.local else StorageType.CHROMA
     if args.task == "clean":
-        chunk_store.clear()
-        if args.local:
-            print(f"Cleared local chunk store at {args.output_dir}.")
+        output = args.output_dir if args.local else args.collection_name
+        clean(store_type, output)
     elif args.task == "save":
-        if args.source:
-            run_chunking(args, chunk_store)
+        if args.clean:
+            output = args.output_dir if args.local else args.collection_name
+            clean(store_type, output)
+            if not args.local:
+                print(f"Cleared collection '{args.collection_name}'.")
+        if args.source and args.strategy:
+            storage_type = StorageType.LOCAL if args.local else StorageType.CHROMA
+            run_chunking(args, storage_type)
         else:
-            print("Error: 'source' argument is required for the 'save' task.")
-    # Add placeholders for other tasks
+            print(
+                "Error: 'source' and 'strategy' arguments are required for the 'save' task."
+            )
     elif args.task == "search":
-        print("Search functionality not yet implemented.")
+        if args.query:
+            storage_use_case = StorageUseCase(store_type)
+            relevant_chunks = asyncio.run(storage_use_case.search(args.query, args.top_k))
+            if relevant_chunks:
+                print(f"Found {len(relevant_chunks)} relevant chunks:")
+                for i, chunk in enumerate(relevant_chunks):
+                    print(f"\n--- Chunk {i+1} ---")
+                    print(f"Content: {chunk.content}")
+                    print(f"Metadata: {chunk.metadata}")
+            else:
+                print("No relevant chunks found.")
+        else:
+            print("Error: '--query' argument is required for the 'search' task.")
+    elif args.task == "talk":
+        if args.query:
+            asyncio.run(run_talk(args, store_type))
+        else:
+            print("Error: '--query' argument is required for the 'talk' task.")
     elif args.task == "delete":
         print("Delete functionality not yet implemented.")
 

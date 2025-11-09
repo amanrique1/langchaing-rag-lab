@@ -1,10 +1,8 @@
 from enum import Enum
 
-
-class DocumentLoaderMode(str, Enum):
-    SINGLE = "single"
-    ELEMENTS = "elements"
-
+class StorageType(str, Enum):
+    LOCAL = "local"
+    CHROMA = "chroma"
 
 class LengthBasedChunkingMode(str, Enum):
     CHARACTER = "character"

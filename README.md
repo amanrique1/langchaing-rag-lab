@@ -6,7 +6,6 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 
 *   **Multiple Chunking Strategies**: Supports Length-Based, Structure-Based, and Semantic Chunking.
 *   **Hexagonal Architecture**: Clean separation of concerns for robust and testable code.
-*   **Flexible Document Loading**: Currently supports Markdown documents with single and batch processing modes.
 *   **Pluggable Chunk Stores**: Stores processed chunks in either the local file system or ChromaDB.
 *   **Task-Based CLI**: Easy-to-use command-line interface for document processing, searching, and management.
 *   **Google Gemini Integration**: Uses Google's embedding models for semantic chunking.
@@ -93,8 +92,6 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
          ▼
 ┌─────────────────┐
 │ Document Loader │ (MarkdownDocumentLoader)
-│  - Single mode  │
-│  - Batch mode   │
 └────────┬────────┘
          │
          ▼
@@ -256,8 +253,9 @@ poetry run cli [TASK] [SOURCE] [STRATEGY] [OPTIONS]
 | Task | Description | Required Arguments |
 | :--- | :--- | :--- |
 | `save` | Process and save document chunks | `SOURCE`, `STRATEGY` |
-| `search` | Search for similar chunks (coming soon) | - |
-| `delete` | Delete specific chunks (coming soon) | - |
+| `search` | Search for similar chunks | `--query` |
+| `talk` | Ask a question and get an answer from the documents | `--query` |
+| `delete` | Not yet implemented. | - |
 | `clean` | Clear the chunk store | - |
 
 ### Common Arguments
@@ -270,15 +268,11 @@ poetry run cli [TASK] [SOURCE] [STRATEGY] [OPTIONS]
 | Option | Description | Default |
 | :--- | :--- | :--- |
 | `--config` | JSON string with strategy configuration | `{}` |
-| `--loader-mode` | Document loading mode: `single` or `batch` | `single` |
+| `--query` | The question to ask for `talk` and `search` tasks | `None` |
+| `--top-k` | Number of top relevant chunks to retrieve for `search` and `talk` tasks | `5` |
 | `--local` | Store chunks locally in the file system | `false` (uses ChromaDB) |
 | `--output-dir` | Directory to save chunks (with `--local`) | `output_chunks` |
 | `--collection-name` | ChromaDB collection name | `default_collection` |
-
-### Document Loader Modes
-
-*   **`single`**: Processes each file as a separate document (maintains file boundaries)
-*   **`batch`**: Combines all files into a single document (treats directory as one corpus)
 
 ---
 
@@ -417,20 +411,7 @@ poetry run cli save data length_based \
 
 ---
 
-### Example 5: Batch Mode Processing
-
-**Scenario**: Process all files as a single document.
-
-```bash
-poetry run cli save data semantic \
-  --loader-mode batch \
-  --config '{"breakpoint_threshold_type": "absolute", "breakpoint_threshold_amount": 0.8}' \
-  --collection-name 'batch_docs'
-```
-
----
-
-### Example 6: Cleaning Stores
+### Example 5: Cleaning Stores
 
 **Clean ChromaDB Collection**:
 ```bash
@@ -440,6 +421,62 @@ poetry run cli clean --collection-name 'technical_docs'
 **Clean Local Directory**:
 ```bash
 poetry run cli clean --local --output-dir 'output_chunks'
+```
+
+---
+
+### Example 6: Talk to Your Documents
+
+**Scenario**: Ask a question about the content of your documents.
+
+First, save your documents to a collection:
+```bash
+poetry run cli save data semantic --collection-name 'my_docs'
+```
+
+Then, ask a question using the `talk` task:
+```bash
+poetry run cli talk --query "What are the main software architecture principles?" --collection-name 'my_docs'
+```
+
+**Output**:
+```
+Question: What are the main software architecture principles?
+
+Answer: The main software architecture principles are... (The model will generate an answer based on the retrieved content).
+```
+
+---
+
+### Example 7: Search for Relevant Chunks
+
+**Scenario**: Find document chunks most relevant to a specific query.
+
+First, ensure your documents are saved to a collection (e.g., `my_docs` as in the previous example):
+```bash
+poetry run cli save data semantic --collection-name 'my_docs'
+```
+
+Then, search for relevant chunks using the `search` task:
+```bash
+poetry run cli search --query "What is hexagonal architecture?" --collection-name 'my_docs' --top-k 3
+```
+
+**Output**:
+```
+Found 3 relevant chunks:
+
+--- Chunk 1 ---
+Content: This project is built using a **Hexagonal Architecture** (also known as Ports and Adapters). This design pattern isolates the core application logic from external concerns such as databases, user interfaces, and third-party APIs.
+Metadata: {'source': 'data/software_architecture_guide.md', 'header': 'Architecture'}
+
+--- Chunk 2 ---
+Content: The main software architecture principles are... (The model will generate an answer based on the retrieved content).
+Metadata: {'source': 'data/software_architecture_guide.md', 'header': 'Core Concepts'}
+
+--- Chunk 3 ---
+Content: This project serves as a **conversational AI lab**, providing a flexible framework for **Retrieval Augmented Generation (RAG) pipelines**. It focuses on intelligently chunking text documents using various strategies, built with a hexagonal architecture to ensure maintainability, scalability, and modularity.
+Metadata: {'source': 'data/README.md', 'header': 'LangChain RAG Lab'}
 ```
 
 ---
@@ -577,29 +614,16 @@ langchain-rag-lab/
 
 ## Roadmap
 
-- [ ] **Search Functionality**: Implement vector similarity search in CLI
 - [ ] **Delete Operations**: Add chunk deletion by ID or filter
 - [ ] **Additional Loaders**: Support for PDF, DOCX, HTML
 - [ ] **Embedding Cache**: Cache embeddings to speed up semantic chunking
-- [ ] **Web UI**: Simple web interface for chunk management
 - [ ] **Async Processing**: Support for asynchronous document processing
-- [ ] **Custom Embedding Models**: Support for other embedding providers (OpenAI, HuggingFace)
+- [ ] **Custom Embedding Models**: Support for other embedding providers (Ollama, OpenAI, HuggingFace)
 - [ ] **Chunk Evaluation**: Metrics for chunk quality assessment
 
 ---
 
-## Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/your-feature`
-3. **Write tests**: Ensure >90% coverage for new code
-4. **Follow code style**: Use Black for formatting, Pylint for linting
-5. **Update documentation**: Update README if adding new features
-6. **Submit a pull request**
-
-### Development Setup
+## Development Setup
 
 ```bash
 # Install dev dependencies
@@ -612,28 +636,3 @@ poetry run pylint src/
 # Run tests before committing
 poetry run pytest --cov=src
 ```
-
----
-
-## License
-
-This project is licensed under the MIT License. See `LICENSE` file for details.
-
----
-
-## Acknowledgments
-
-- **LangChain**: For providing the RAG framework
-- **ChromaDB**: For the embedding database
-- **Google Gemini**: For embedding models
-- **Poetry**: For dependency management
-
----
-
-## Contact
-
-For questions, issues, or feature requests, please open an issue on GitHub.
-
----
-
-**Happy Chunking! 🚀📄✨**

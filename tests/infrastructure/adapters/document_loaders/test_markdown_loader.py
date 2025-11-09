@@ -4,7 +4,6 @@ from pathlib import Path
 from src.infrastructure.adapters.document_loaders.markdown_loader import (
     MarkdownDocumentLoader,
 )
-from src.domain.models.enums import DocumentLoaderMode
 
 
 @pytest.fixture
@@ -18,7 +17,7 @@ def temp_markdown_file():
 
 def test_markdown_document_loader(temp_markdown_file):
     loader = MarkdownDocumentLoader()
-    documents = loader.load(source=temp_markdown_file, mode=DocumentLoaderMode.SINGLE)
+    documents = loader.load(source=temp_markdown_file)
     assert len(documents) == 1
     assert documents[0].metadata["file_name"] == "test.md"
 

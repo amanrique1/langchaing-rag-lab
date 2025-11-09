@@ -9,18 +9,16 @@ from src.domain.strategies.structure_based_chunking import (
 )
 from src.domain.strategies.semantic_chunking import SemanticChunkingStrategy
 from src.domain.models.chunk import Chunk
-from src.domain.models.enums import DocumentLoaderMode
 
 
 class ChunkingUseCase:
-    def __init__(self, document_loader: DocumentLoader, chunk_store: ChunkStore):
+    def __init__(self, document_loader: DocumentLoader):
         self.document_loader = document_loader
         self.strategies: Dict[str, ChunkingStrategy] = {
             "length_based": LengthBasedChunkingStrategy,
             "structure_based": StructureBasedChunkingStrategy,
             "semantic": SemanticChunkingStrategy,
         }
-        self.chunk_store = chunk_store
 
     def execute(
         self,
@@ -29,8 +27,7 @@ class ChunkingUseCase:
         strategy_config: Dict[str, Any],
         loader_mode: str = "single",
     ) -> List[Chunk]:
-        loader_mode_enum = DocumentLoaderMode(loader_mode)
-        documents = self.document_loader.load(source, loader_mode_enum)
+        documents = self.document_loader.load(source)
 
         strategy_class = self.strategies.get(strategy_name)
         if not strategy_class:
@@ -40,5 +37,4 @@ class ChunkingUseCase:
         chunking_service = ChunkingService(strategy)
 
         chunks = chunking_service.chunk_documents(documents)
-        self.chunk_store.save(chunks)
         return chunks

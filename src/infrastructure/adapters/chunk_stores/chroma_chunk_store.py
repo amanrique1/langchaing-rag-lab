@@ -8,11 +8,9 @@ from src.domain.models.chunk import Chunk
 
 
 class ChromaChunkStore(ChunkStore):
-    def __init__(
-        self, collection_name: str = "rag_docs", persist_directory: str = "./chroma_db"
-    ):
+    def __init__(self, collection_name: str = "rag_docs"):
         self.collection_name = collection_name
-        self.persist_directory = persist_directory
+        self.persist_directory = "./chroma_db"
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         self.vector_store = Chroma(
             collection_name=self.collection_name,

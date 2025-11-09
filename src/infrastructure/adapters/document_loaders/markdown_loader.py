@@ -2,13 +2,12 @@ from typing import List
 from pathlib import Path
 from application.ports.document_loader import DocumentLoader
 from domain.models.document import Document
-from domain.models.enums import DocumentLoaderMode
 from langchain_community.document_loaders import UnstructuredMarkdownLoader
 
 
 class MarkdownDocumentLoader(DocumentLoader):
     def load(
-        self, source: str, mode: DocumentLoaderMode = DocumentLoaderMode.SINGLE
+        self, source: str
     ) -> List[Document]:
         documents = []
         data_path = Path(source)
@@ -24,7 +23,7 @@ class MarkdownDocumentLoader(DocumentLoader):
         for file_path in markdown_files:
             loader = UnstructuredMarkdownLoader(
                 str(file_path),
-                mode=mode.value,
+                mode="single",
                 strategy="fast",
                 include_page_breaks=False,
                 chunking_strategy=None,
