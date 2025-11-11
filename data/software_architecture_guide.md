@@ -1,84 +1,84 @@
-# Guía de Arquitectura de Software
+# Software Architecture Guide
 
-## Introducción
+## Introduction
 
-La arquitectura de software define la estructura fundamental de un sistema, estableciendo los componentes principales, sus relaciones y los principios que guían su diseño y evolución.
+Software architecture defines the fundamental structure of a system, establishing the main components, their relationships, and the principles that guide its design and evolution.
 
-## Principios Fundamentales
+## Fundamental Principles
 
-### 1. Separación de Responsabilidades
-Cada componente debe tener una responsabilidad específica y bien definida. Esto facilita el mantenimiento, testing y escalabilidad del sistema.
+### 1. Separation of Concerns
+Each component should have a specific and well-defined responsibility. This facilitates the maintenance, testing, and scalability of the system.
 
-### 2. Bajo Acoplamiento, Alta Cohesión
-- **Bajo Acoplamiento**: Los módulos deben depender mínimamente entre sí
-- **Alta Cohesión**: Los elementos dentro de un módulo deben trabajar juntos hacia un objetivo común
+### 2. Low Coupling, High Cohesion
+-   **Low Coupling**: Modules should have minimal dependency on each other.
+-   **High Cohesion**: Elements within a module should work together toward a common goal.
 
-### 3. Principio de Responsabilidad Única (SRP)
-Una clase debe tener una sola razón para cambiar. Esto significa que debe tener una sola responsabilidad.
+### 3. Single Responsibility Principle (SRP)
+A class should have only one reason to change. This means it should have a single responsibility.
 
-## Patrones Arquitectónicos
+## Architectural Patterns
 
-### Arquitectura en Capas (Layered Architecture)
-Organiza el sistema en capas horizontales:
-- **Capa de Presentación**: Interfaz de usuario
-- **Capa de Lógica de Negocio**: Reglas y procesos del dominio
-- **Capa de Acceso a Datos**: Persistencia y recuperación de datos
+### Layered Architecture
+Organizes the system into horizontal layers:
+-   **Presentation Layer**: User interface
+-   **Business Logic Layer**: Domain rules and processes
+-   **Data Access Layer**: Data persistence and retrieval
 
-### Microservicios
-Divide la aplicación en servicios pequeños e independientes que se comunican a través de APIs REST o mensajería.
+### Microservices
+Divides the application into small, independent services that communicate via REST APIs or messaging.
 
-**Ventajas:**
-- Escalabilidad independiente
-- Tecnologías heterogéneas
-- Despliegue independiente
+**Advantages:**
+-   Independent scalability
+-   Heterogeneous technologies
+-   Independent deployment
 
-**Desventajas:**
-- Complejidad de red
-- Gestión de datos distribuidos
-- Monitoreo complejo
+**Disadvantages:**
+-   Network complexity
+-   Distributed data management
+-   Complex monitoring
 
 ### Event-Driven Architecture
-Los componentes se comunican mediante eventos, permitiendo un desacoplamiento temporal y espacial.
+Components communicate through events, allowing for temporal and spatial decoupling.
 
-## Consideraciones de Escalabilidad
+## Scalability Considerations
 
-### Escalabilidad Horizontal vs Vertical
-- **Horizontal**: Agregar más servidores
-- **Vertical**: Mejorar hardware existente
+### Horizontal vs. Vertical Scalability
+-   **Horizontal**: Adding more servers
+-   **Vertical**: Upgrading existing hardware
 
-### Patrones de Escalabilidad
-1. **Load Balancing**: Distribución de carga
-2. **Caching**: Almacenamiento en caché
-3. **Database Sharding**: Particionamiento de datos
-4. **CDN**: Redes de distribución de contenido
+### Scalability Patterns
+1.  **Load Balancing**: Distributing traffic
+2.  **Caching**: Storing data in a cache
+3.  **Database Sharding**: Partitioning data
+4.  **CDN**: Content Delivery Networks
 
-## Seguridad en la Arquitectura
+## Security in Architecture
 
-### Principios de Seguridad
-- **Defensa en Profundidad**: Múltiples capas de seguridad
-- **Principio de Menor Privilegio**: Acceso mínimo necesario
-- **Fail Secure**: Fallar de manera segura
+### Security Principles
+-   **Defense in Depth**: Multiple layers of security
+-   **Principle of Least Privilege**: Minimum necessary access
+-   **Fail Secure**: Failing in a secure manner
 
-### Implementación
-- Autenticación y autorización
-- Cifrado de datos en tránsito y reposo
-- Validación de entrada
-- Logging y auditoría
+### Implementation
+-   Authentication and authorization
+-   Encryption of data in transit and at rest
+-   Input validation
+-   Logging and auditing
 
-## Métricas y Monitoreo
+## Metrics and Monitoring
 
-### Métricas Clave
-- **Latencia**: Tiempo de respuesta
-- **Throughput**: Solicitudes por segundo
-- **Disponibilidad**: Tiempo de actividad
-- **Tasa de Error**: Porcentaje de errores
+### Key Metrics
+-   **Latency**: Response time
+-   **Throughput**: Requests per second
+-   **Availability**: Uptime
+-   **Error Rate**: Percentage of errors
 
-### Herramientas de Monitoreo
-- Prometheus + Grafana
-- ELK Stack (Elasticsearch, Logstash, Kibana)
-- New Relic
-- DataDog
+### Monitoring Tools
+-   Prometheus + Grafana
+-   ELK Stack (Elasticsearch, Logstash, Kibana)
+-   New Relic
+-   DataDog
 
-## Conclusión
+## Conclusion
 
-Una buena arquitectura de software es fundamental para el éxito a largo plazo de cualquier proyecto. Debe balancear las necesidades actuales con la flexibilidad para evolucionar según cambien los requisitos.
+A good software architecture is fundamental to the long-term success of any project. It must balance current needs with the flexibility to evolve as requirements change.

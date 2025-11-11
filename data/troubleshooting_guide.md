@@ -1,41 +1,41 @@
-# Guía de Troubleshooting - Problemas Comunes
+# Troubleshooting Guide - Common Problems
 
-## Problemas de Performance
+## Performance Issues
 
-### PROBLEMA: Alta latencia en respuestas de API
+### PROBLEM: High Latency in API Responses
 
-**Síntomas:**
-- Tiempos de respuesta > 2 segundos
-- Timeouts frecuentes
-- Quejas de usuarios sobre lentitud
+**Symptoms:**
+- Response times > 2 seconds
+- Frequent timeouts
+- User complaints about slowness
 
-**Diagnóstico:**
-1. Verificar métricas de APM (Application Performance Monitoring)
-2. Analizar logs de aplicación y base de datos
-3. Revisar utilización de CPU y memoria
-4. Comprobar queries de base de datos lentas
+**Diagnosis:**
+1.  Check APM (Application Performance Monitoring) metrics.
+2.  Analyze application and database logs.
+3.  Review CPU and memory utilization.
+4.  Check for slow database queries.
 
-**Soluciones:**
+**Solutions:**
 
-**Solución 1: Optimización de Queries**
+**Solution 1: Query Optimization**
 ```sql
--- Antes (query lenta)
-SELECT * FROM usuarios u 
-JOIN pedidos p ON u.id = p.usuario_id 
-WHERE u.activo = 1;
+-- Before (slow query)
+SELECT * FROM users u 
+JOIN orders o ON u.id = o.user_id 
+WHERE u.active = 1;
 
--- Después (query optimizada con índices)
-SELECT u.id, u.nombre, p.total 
-FROM usuarios u 
-JOIN pedidos p ON u.id = p.usuario_id 
-WHERE u.activo = 1 
-AND u.fecha_creacion > '2024-01-01';
+-- After (optimized query with indexes)
+SELECT u.id, u.name, o.total 
+FROM users u 
+JOIN orders o ON u.id = o.user_id 
+WHERE u.active = 1 
+AND u.creation_date > '2024-01-01';
 
--- Agregar índice
-CREATE INDEX idx_usuarios_activo_fecha ON usuarios(activo, fecha_creacion);
+-- Add index
+CREATE INDEX idx_users_active_date ON users(active, creation_date);
 ```
 
-**Solución 2: Implementar Caché**
+**Solution 2: Implement Caching**
 ```python
 import redis
 from functools import wraps
@@ -46,12 +46,12 @@ def cache_result(expiration=300):
         def wrapper(*args, **kwargs):
             cache_key = f"{func.__name__}:{hash(str(args) + str(kwargs))}"
             
-            # Intentar obtener del caché
+            # Try to get from cache
             cached_result = redis_client.get(cache_key)
             if cached_result:
                 return json.loads(cached_result)
             
-            # Ejecutar función y guardar en caché
+            # Execute function and save to cache
             result = func(*args, **kwargs)
             redis_client.setex(cache_key, expiration, json.dumps(result))
             return result
@@ -59,9 +59,9 @@ def cache_result(expiration=300):
     return decorator
 ```
 
-**Solución 3: Conexión Pool de Base de Datos**
+**Solution 3: Database Connection Pool**
 ```python
-# Configuración optimizada de conexiones
+# Optimized connection settings
 DATABASE_CONFIG = {
     'pool_size': 20,
     'max_overflow': 30,
@@ -71,38 +71,38 @@ DATABASE_CONFIG = {
 }
 ```
 
-### PROBLEMA: Memory Leaks en aplicación Node.js
+### PROBLEM: Memory Leaks in Node.js Application
 
-**Síntomas:**
-- Uso de memoria crece constantemente
-- Performance degradada en el tiempo
-- Eventual crash por falta de memoria
+**Symptoms:**
+- Memory usage grows constantly
+- Performance degrades over time
+- Eventual crash due to out of memory
 
-**Diagnóstico:**
+**Diagnosis:**
 ```bash
-# Monitorear uso de memoria
+# Monitor memory usage
 node --inspect --max-old-space-size=4096 app.js
 
-# Generar heap dump
+# Generate heap dump
 kill -USR2 <node_process_id>
 
-# Analizar con herramientas
+# Analyze with tools
 node --prof app.js
 node --prof-process isolate-0x[...].log > profile.txt
 ```
 
-**Soluciones:**
+**Solutions:**
 
-**Solución 1: Limpiar Event Listeners**
+**Solution 1: Clean Up Event Listeners**
 ```javascript
-// Problemático
+// Problematic
 class MyComponent {
     constructor() {
         window.addEventListener('resize', this.handleResize);
     }
 }
 
-// Correcto
+// Correct
 class MyComponent {
     constructor() {
         this.handleResize = this.handleResize.bind(this);
@@ -115,48 +115,48 @@ class MyComponent {
 }
 ```
 
-**Solución 2: Gestión de Streams**
+**Solution 2: Stream Management**
 ```javascript
-// Problemático
+// Problematic
 const fs = require('fs');
 const stream = fs.createReadStream('large-file.txt');
-// Stream nunca se cierra
+// Stream is never closed
 
-// Correcto
+// Correct
 const fs = require('fs');
 const stream = fs.createReadStream('large-file.txt');
 stream.on('end', () => stream.close());
 stream.on('error', () => stream.close());
 ```
 
-## Problemas de Conectividad
+## Connectivity Issues
 
-### PROBLEMA: Errores de conexión a base de datos
+### PROBLEM: Database Connection Errors
 
-**Síntomas:**
+**Symptoms:**
 - Error: "Connection refused"
 - Error: "Too many connections"
-- Timeouts intermitentes
+- Intermittent timeouts
 
-**Diagnóstico:**
+**Diagnosis:**
 ```bash
-# Verificar conectividad
+# Check connectivity
 telnet db-server 5432
 
-# Verificar conexiones activas
+# Check active connections
 psql -c "SELECT count(*) FROM pg_stat_activity;"
 
-# Revisar logs de PostgreSQL
+# Review PostgreSQL logs
 tail -f /var/log/postgresql/postgresql.log
 ```
 
-**Soluciones:**
+**Solutions:**
 
-**Solución 1: Configurar Connection Pooling**
+**Solution 1: Configure Connection Pooling**
 ```python
 import psycopg2.pool
 
-# Crear pool de conexiones
+# Create connection pool
 connection_pool = psycopg2.pool.ThreadedConnectionPool(
     minconn=5,
     maxconn=20,
@@ -173,7 +173,7 @@ def release_db_connection(conn):
     connection_pool.putconn(conn)
 ```
 
-**Solución 2: Implementar Circuit Breaker**
+**Solution 2: Implement Circuit Breaker**
 ```python
 class CircuitBreaker:
     def __init__(self, failure_threshold=5, timeout=60):
@@ -205,42 +205,42 @@ class CircuitBreaker:
             raise e
 ```
 
-### PROBLEMA: SSL/TLS Certificate Errors
+### PROBLEM: SSL/TLS Certificate Errors
 
-**Síntomas:**
+**Symptoms:**
 - Error: "certificate verify failed"
 - Error: "SSL handshake failed"
 - Browsers showing security warnings
 
-**Diagnóstico:**
+**Diagnosis:**
 ```bash
-# Verificar certificado
+# Verify certificate
 openssl s_client -connect example.com:443 -servername example.com
 
-# Verificar fechas de expiración
+# Check expiration dates
 echo | openssl s_client -connect example.com:443 2>/dev/null | openssl x509 -noout -dates
 
-# Verificar cadena de certificados
+# Verify certificate chain
 openssl verify -CAfile ca-bundle.crt certificate.crt
 ```
 
-**Soluciones:**
+**Solutions:**
 
-**Solución 1: Renovar Certificado con Let's Encrypt**
+**Solution 1: Renew Certificate with Let's Encrypt**
 ```bash
-# Installar certbot
+# Install certbot
 sudo apt-get install certbot python3-certbot-nginx
 
-# Obtener certificado
+# Obtain certificate
 sudo certbot --nginx -d example.com
 
-# Configurar renovación automática
+# Configure automatic renewal
 sudo crontab -e
-# Agregar línea:
+# Add line:
 0 12 * * * /usr/bin/certbot renew --quiet
 ```
 
-**Solución 2: Configurar Nginx para SSL**
+**Solution 2: Configure Nginx for SSL**
 ```nginx
 server {
     listen 443 ssl http2;
@@ -260,54 +260,54 @@ server {
 }
 ```
 
-## Problemas de Deployment
+## Deployment Issues
 
-### PROBLEMA: Docker containers failing to start
+### PROBLEM: Docker containers failing to start
 
-**Síntomas:**
+**Symptoms:**
 - Container exits immediately
 - Error: "standard_init_linux.go: exec user process caused: no such file or directory"
 - Health checks failing
 
-**Diagnóstico:**
+**Diagnosis:**
 ```bash
-# Verificar logs del container
+# Check container logs
 docker logs container_name
 
-# Inspeccionar container
+# Inspect container
 docker inspect container_name
 
-# Ejecutar shell en container para debug
+# Run a shell in the container for debugging
 docker run -it --entrypoint /bin/sh image_name
 
-# Verificar recursos del sistema
+# Check system resources
 docker stats
 ```
 
-**Soluciones:**
+**Solutions:**
 
-**Solución 1: Corregir Dockerfile**
+**Solution 1: Correct the Dockerfile**
 ```dockerfile
-# Problemático
+# Problematic
 FROM node:alpine
 COPY . .
 RUN npm install
 CMD ["node", "app.js"]
 
-# Correcto
+# Correct
 FROM node:16-alpine
 
-# Crear usuario no-root
+# Create a non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nextjs -u 1001
 
 WORKDIR /app
 
-# Copiar archivos de dependencias primero
+# Copy dependency files first
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# Copiar código fuente
+# Copy source code
 COPY --chown=nextjs:nodejs . .
 
 USER nextjs
@@ -321,7 +321,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 CMD ["node", "app.js"]
 ```
 
-**Solución 2: Configurar Docker Compose con limits**
+**Solution 2: Configure Docker Compose with limits**
 ```yaml
 version: '3.8'
 services:
@@ -348,32 +348,32 @@ services:
       start_period: 40s
 ```
 
-### PROBLEMA: Kubernetes Pods in CrashLoopBackOff
+### PROBLEM: Kubernetes Pods in CrashLoopBackOff
 
-**Síntomas:**
-- Pods reiniciando constantemente
+**Symptoms:**
+- Pods restarting constantly
 - Status: CrashLoopBackOff
 - Application not accessible
 
-**Diagnóstico:**
+**Diagnosis:**
 ```bash
-# Verificar status de pods
+# Check pod status
 kubectl get pods
 
-# Verificar logs
+# Check logs (including previous container instance)
 kubectl logs pod-name --previous
 
-# Describir pod para eventos
+# Describe pod for events
 kubectl describe pod pod-name
 
-# Verificar recursos del nodo
+# Check node and pod resources
 kubectl top nodes
 kubectl top pods
 ```
 
-**Soluciones:**
+**Solutions:**
 
-**Solución 1: Ajustar Resource Limits**
+**Solution 1: Adjust Resource Limits**
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -401,7 +401,7 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-        # Probes para verificar salud
+        # Probes to check health
         livenessProbe:
           httpGet:
             path: /health
@@ -416,7 +416,7 @@ spec:
           periodSeconds: 5
 ```
 
-**Solución 2: Configurar Startup Probe para aplicaciones lentas**
+**Solution 2: Configure Startup Probe for slow-starting applications**
 ```yaml
 containers:
 - name: app
@@ -439,54 +439,54 @@ containers:
     periodSeconds: 5
 ```
 
-## Herramientas de Monitoreo y Debug
+## Monitoring and Debugging Tools
 
-### Comandos Útiles para Diagnostico
+### Useful Diagnostic Commands
 
 **System Resources:**
 ```bash
-# CPU y memoria
+# CPU and memory
 htop
-# o
+# or
 top -p `pgrep -d',' node`
 
-# Espacio en disco
+# Disk space
 df -h
 du -sh /var/log/*
 
-# Conexiones de red
+# Network connections
 netstat -tulpn | grep :3000
 ss -tulpn | grep :3000
 
-# Procesos que usan más memoria
+# Processes using the most memory
 ps aux --sort=-%mem | head
 
-# I/O de disco
+# Disk I/O
 iotop
 ```
 
 **Application Logs:**
 ```bash
-# Seguir logs en tiempo real
+# Follow logs in real-time
 tail -f /var/log/app/application.log
 
-# Buscar errores en logs
+# Search for errors in logs
 grep -i error /var/log/app/application.log | tail -20
 
-# Contar errores por hora
+# Count errors per hour
 grep -i error /var/log/app/application.log | awk '{print $1" "$2}' | sort | uniq -c
 
-# Analizar logs con jq (para JSON logs)
+# Analyze logs with jq (for JSON logs)
 cat app.log | jq 'select(.level == "error")'
 ```
 
-### Scripts de Monitoreo Automatizado
+### Automated Monitoring Scripts
 
 **Health Check Script:**
 ```bash
 #!/bin/bash
 
-# Script de health check automático
+# Automatic health check script
 ENDPOINT="http://localhost:3000/health"
 MAX_RETRIES=3
 RETRY_COUNT=0
@@ -505,10 +505,10 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 echo "$(date): Service is unhealthy after $MAX_RETRIES attempts"
-# Aquí se puede agregar lógica para restart automático
+# Logic for automatic restart can be added here
 exit 1
 ```
 
 ---
 
-**Nota**: Esta guía debe actualizarse regularmente basándose en los problemas más frecuentes encontrados en producción. Para reportar nuevos problemas o sugerir mejoras, crear un ticket en el sistema de seguimiento de issues.
+**Note**: This guide should be updated regularly based on the most frequent problems encountered in production. To report new problems or suggest improvements, create a ticket in the issue tracking system.

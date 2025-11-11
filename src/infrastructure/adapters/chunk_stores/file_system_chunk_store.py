@@ -27,14 +27,6 @@ class FileSystemChunkStore(ChunkStore):
                     indent=4,
                 )
 
-    def get(self, chunk_id: str) -> Chunk | None:
-        file_path = self.output_dir / f"chunk_{chunk_id}.json"
-        if file_path.exists():
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return Chunk(content=data["content"], metadata=data["metadata"])
-        return None
-
     def delete(self, chunk_id: str):
         file_path = self.output_dir / f"chunk_{chunk_id}.json"
         if file_path.exists():

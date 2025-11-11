@@ -1,43 +1,43 @@
-# Manual Técnico de Desarrollo de Software
+# Software Development Technical Manual
 
-## Desarrollo de APIs REST
+## REST API Development
 
-Las APIs REST representan el estándar de facto para servicios web modernos. Utilizan métodos HTTP estándar como GET, POST, PUT y DELETE para operaciones CRUD. El diseño RESTful enfatiza la separación entre cliente y servidor, donde cada request debe ser stateless y contener toda la información necesaria. Los endpoints deben usar sustantivos en plural y evitar verbos en las URLs. Los códigos de respuesta HTTP proporcionan información clara sobre el resultado de cada operación, desde 200 para éxito hasta 404 para recursos no encontrados.
+REST APIs represent the de facto standard for modern web services. They use standard HTTP methods like GET, POST, PUT, and DELETE for CRUD operations. RESTful design emphasizes the separation between client and server, where each request must be stateless and contain all necessary information. Endpoints should use plural nouns and avoid verbs in the URLs. HTTP response codes provide clear information about the outcome of each operation, from 200 for success to 404 for resources not found.
 
-La autenticación en APIs modernas típicamente utiliza JWT tokens o API keys. Los tokens JWT contienen información del usuario codificada y firmada, permitiendo verificación sin consultar la base de datos. La paginación es crucial para APIs que manejan grandes datasets, usando enfoques como offset-based o cursor-based pagination. El versionado de APIs asegura compatibilidad hacia atrás, implementándose comúnmente en la URL como /v1/ o /v2/.
+Authentication in modern APIs typically uses JWT tokens or API keys. JWT tokens contain encoded and signed user information, allowing verification without querying the database. Pagination is crucial for APIs that handle large datasets, using approaches like offset-based or cursor-based pagination. API versioning ensures backward compatibility and is commonly implemented in the URL, such as `/v1/` or `/v2/`.
 
-## Gestión de Bases de Datos
+## Database Management
 
-Los sistemas de bases de datos requieren consideraciones fundamentalmente diferentes a las APIs. La normalización de datos es esencial para eliminar redundancia y mantener integridad referencial. Las tablas deben diseñarse siguiendo las formas normales, típicamente hasta la tercera forma normal para aplicaciones empresariales. Los índices mejoran el rendimiento de consultas pero impactan la velocidad de escritura, requiriendo un balance cuidadoso.
+Database systems require fundamentally different considerations than APIs. Data normalization is essential to eliminate redundancy and maintain referential integrity. Tables should be designed following normal forms, typically up to the third normal form for enterprise applications. Indexes improve query performance but impact write speed, requiring a careful balance.
 
-Las transacciones ACID garantizan consistencia de datos en operaciones complejas. El aislamiento de transacciones previene problemas como dirty reads y phantom reads. Los stored procedures encapsulan lógica de negocio en la base de datos, mejorando performance pero reduciendo portabilidad. Las estrategias de backup incluyen backups completos, incrementales y de logs de transacciones. La replicación master-slave proporciona alta disponibilidad y distribución de carga de lectura.
+ACID transactions guarantee data consistency in complex operations. Transaction isolation prevents issues like dirty reads and phantom reads. Stored procedures encapsulate business logic in the database, improving performance but reducing portability. Backup strategies include full backups, incremental backups, and transaction log backups. Master-slave replication provides high availability and read load distribution.
 
-## Ciberseguridad en Aplicaciones
+## Application Cybersecurity
 
-La seguridad de aplicaciones abarca múltiples capas desde la infraestructura hasta el código. Las vulnerabilidades más comunes incluyen inyección SQL, cross-site scripting (XSS) y cross-site request forgery (CSRF). La validación de entrada debe ocurrir tanto en cliente como servidor, nunca confiando únicamente en validación del lado cliente. El principio de menor privilegio limita accesos a lo mínimo necesario para cada rol.
+Application security spans multiple layers, from the infrastructure to the code. The most common vulnerabilities include SQL injection, cross-site scripting (XSS), and cross-site request forgery (CSRF). Input validation must occur on both the client and server, never relying solely on client-side validation. The principle of least privilege limits access to the minimum necessary for each role.
 
-El cifrado en tránsito utiliza TLS 1.3 para proteger datos entre cliente y servidor. El cifrado en reposo protege datos almacenados usando algoritmos como AES-256. Las claves de cifrado requieren rotación periódica y almacenamiento seguro en servicios especializados como AWS KMS o HashiCorp Vault. Los logs de auditoría deben capturar todos los accesos y cambios críticos, manteniéndose inmutables y monitoreados por sistemas SIEM.
+Encryption in transit uses TLS 1.3 to protect data between the client and server. Encryption at rest protects stored data using algorithms like AES-256. Encryption keys require periodic rotation and secure storage in specialized services like AWS KMS or HashiCorp Vault. Audit logs must capture all critical access and changes, remaining immutable and monitored by SIEM systems.
 
-## Metodologías de Testing
+## Testing Methodologies
 
-El testing de software abarca diferentes niveles desde unit tests hasta end-to-end testing. Los unit tests verifican funciones individuales en aislamiento, usando mocks y stubs para dependencias externas. La cobertura de código debe alcanzar al menos 80% pero la calidad de tests es más importante que la cantidad. Los integration tests verifican interacciones entre módulos, especialmente importante para microservicios.
+Software testing encompasses different levels, from unit tests to end-to-end testing. Unit tests verify individual functions in isolation, using mocks and stubs for external dependencies. Code coverage should reach at least 80%, but the quality of tests is more important than the quantity. Integration tests verify interactions between modules, which is especially important for microservices.
 
-Test-driven development (TDD) invierte el proceso tradicional, escribiendo tests antes que código de producción. Los tests de rendimiento identifican cuellos de botella usando herramientas como JMeter o k6. Load testing simula usuarios concurrentes mientras stress testing empuja el sistema más allá de límites normales. Los tests de seguridad incluyen penetration testing y análisis estático de código para identificar vulnerabilidades.
+Test-driven development (TDD) inverts the traditional process, writing tests before production code. Performance tests identify bottlenecks using tools like JMeter or k6. Load testing simulates concurrent users, while stress testing pushes the system beyond its normal limits. Security tests include penetration testing and static code analysis to identify vulnerabilities.
 
-## Algoritmos y Estructuras de Datos
+## Algorithms and Data Structures
 
-Los algoritmos de ordenamiento tienen diferentes complejidades temporales y espaciales. Quicksort promedia O(n log n) pero degrada a O(n²) en el peor caso. Mergesort garantiza O(n log n) pero requiere O(n) espacio adicional. Los árboles binarios de búsqueda permiten operaciones O(log n) cuando están balanceados, degradándose a O(n) si se vuelven lineales.
+Sorting algorithms have different time and space complexities. Quicksort averages O(n log n) but degrades to O(n²) in the worst case. Mergesort guarantees O(n log n) but requires O(n) additional space. Binary search trees allow for O(log n) operations when balanced, degrading to O(n) if they become linear.
 
-Las tablas hash proporcionan acceso O(1) promedio pero requieren funciones hash bien distribuidas. Las colas de prioridad implementadas con heaps soportan insert y extract-min en O(log n). Los grafos se representan con listas de adyacencia o matrices, cada uno optimizado para diferentes operaciones. Breadth-first search explora nivel por nivel mientras depth-first search explora profundidad primero, útiles para diferentes tipos de problemas.
+Hash tables provide O(1) average-time access but require well-distributed hash functions. Priority queues implemented with heaps support insert and extract-min in O(log n). Graphs are represented with adjacency lists or matrices, each optimized for different operations. Breadth-first search explores level by level, while depth-first search explores depth-first, useful for different types of problems.
 
-## DevOps y Automatización
+## DevOps and Automation
 
-Docker containeriza aplicaciones con sus dependencias, asegurando consistencia entre entornos. Los contenedores comparten el kernel del host, siendo más ligeros que máquinas virtuales completas. Kubernetes orquesta contenedores a escala, manejando load balancing, auto-scaling y rolling deployments. Los pods agrupan contenedores relacionados, compartiendo almacenamiento y red.
+Docker containerizes applications with their dependencies, ensuring consistency across environments. Containers share the host's kernel, making them lighter than full virtual machines. Kubernetes orchestrates containers at scale, handling load balancing, auto-scaling, and rolling deployments. Pods group related containers, sharing storage and network.
 
-CI/CD pipelines automatizan build, test y deployment. Jenkins, GitLab CI y GitHub Actions proporcionan plataformas populares para pipelines. Infrastructure as Code con Terraform define infraestructura declarativamente, permitiendo versionado y reproducibilidad. Monitoring y logging con Prometheus, Grafana y ELK stack proporcionan visibilidad operacional. Alerting proactivo detecta problemas antes que afecten usuarios.
+CI/CD pipelines automate the build, test, and deployment processes. Jenkins, GitLab CI, and GitHub Actions are popular platforms for pipelines. Infrastructure as Code with Terraform defines infrastructure declaratively, allowing for versioning and reproducibility. Monitoring and logging with the Prometheus, Grafana, and ELK stack provide operational visibility. Proactive alerting detects issues before they affect users.
 
-## Inteligencia Artificial y Machine Learning
+## Artificial Intelligence and Machine Learning
 
-Machine learning transforma datos en modelos predictivos mediante algoritmos de aprendizaje. Supervised learning usa datos etiquetados para clasificación y regresión. Decision trees dividen datos recursivamente, random forests combinan múltiples árboles para mayor robustez. Support vector machines encuentran hiperplanos óptimos para separar clases.
+Machine learning transforms data into predictive models through learning algorithms. Supervised learning uses labeled data for classification and regression. Decision trees recursively split data, while random forests combine multiple trees for greater robustness. Support vector machines find optimal hyperplanes to separate classes.
 
-Neural networks simulan neuronas biológicas con capas de nodos interconectados. Backpropagation entrena redes ajustando pesos mediante gradiente descendente. Deep learning utiliza redes profundas para reconocimiento de patrones complejos. Computer vision procesa imágenes con convolutional neural networks. Natural language processing analiza texto con transformers y attention mechanisms. GPUs aceleran entrenamiento mediante procesamiento paralelo masivo.
+Neural networks simulate biological neurons with layers of interconnected nodes. Backpropagation trains networks by adjusting weights via gradient descent. Deep learning uses deep networks for complex pattern recognition. Computer vision processes images with convolutional neural networks. Natural language processing analyzes text with transformers and attention mechanisms. GPUs accelerate training through massive parallel processing.

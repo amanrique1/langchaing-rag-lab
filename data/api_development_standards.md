@@ -1,70 +1,70 @@
-# Estándares de Desarrollo de APIs
+# API Development Standards
 
-## Diseño RESTful
+## RESTful Design
 
-### Principios REST
-REST (Representational State Transfer) es un estilo arquitectónico para servicios web que define las siguientes restricciones:
+### REST Principles
+REST (Representational State Transfer) is an architectural style for web services that defines the following constraints:
 
-1. **Cliente-Servidor**: Separación clara de responsabilidades
-2. **Sin Estado**: Cada solicitud debe contener toda la información necesaria
-3. **Cacheable**: Las respuestas deben ser marcadas como cacheables o no
-4. **Interfaz Uniforme**: Uso consistente de métodos HTTP y URIs
-5. **Sistema en Capas**: La arquitectura puede estar compuesta por múltiples capas
+1.  **Client-Server**: Clear separation of responsibilities.
+2.  **Stateless**: Every request must contain all the necessary information.
+3.  **Cacheable**: Responses must be marked as cacheable or not.
+4.  **Uniform Interface**: Consistent use of HTTP methods and URIs.
+5.  **Layered System**: The architecture can be composed of multiple layers.
 
-### Métodos HTTP y su Uso
+### HTTP Methods and Their Usage
 
-| Método | Propósito | Idempotente | Seguro |
-|--------|-----------|-------------|--------|
-| GET | Obtener recursos | Sí | Sí |
-| POST | Crear recursos | No | No |
-| PUT | Actualizar/crear recursos | Sí | No |
-| PATCH | Actualización parcial | No | No |
-| DELETE | Eliminar recursos | Sí | No |
+| Method | Purpose | Idempotent | Safe |
+|---|---|---|---|
+| GET | Retrieve resources | Yes | Yes |
+| POST | Create resources | No | No |
+| PUT | Update/create resources | Yes | No |
+| PATCH | Partial update | No | No |
+| DELETE | Delete resources | Yes | No |
 
-### Convenciones de URL
+### URL Conventions
 
-**Estructura Base:**
+**Base Structure:**
 ```
-https://api.ejemplo.com/v1/usuarios/{id}/pedidos/{pedido_id}
+https://api.example.com/v1/users/{id}/orders/{order_id}
 ```
 
-**Reglas:**
-- Usar sustantivos en plural: `/usuarios` no `/usuario`
-- Usar kebab-case para URLs compuestas: `/comentarios-publicos`
-- Evitar verbos en las URLs: `/usuarios` no `/obtener-usuarios`
-- Usar números para versionado: `/v1/`, `/v2/`
+**Rules:**
+- Use plural nouns: `/users` not `/user`
+- Use kebab-case for compound URLs: `/public-comments`
+- Avoid verbs in URLs: `/users` not `/get-users`
+- Use numbers for versioning: `/v1/`, `/v2/`
 
-## Códigos de Estado HTTP
+## HTTP Status Codes
 
-### Códigos de Éxito (2xx)
-- **200 OK**: Solicitud exitosa
-- **201 Created**: Recurso creado exitosamente
-- **202 Accepted**: Solicitud aceptada para procesamiento
-- **204 No Content**: Operación exitosa sin contenido de respuesta
+### Success Codes (2xx)
+-   **200 OK**: Successful request
+-   **201 Created**: Resource created successfully
+-   **202 Accepted**: Request accepted for processing
+-   **204 No Content**: Successful operation with no response content
 
-### Códigos de Error del Cliente (4xx)
-- **400 Bad Request**: Solicitud malformada
-- **401 Unauthorized**: Autenticación requerida
-- **403 Forbidden**: Acceso denegado
-- **404 Not Found**: Recurso no encontrado
-- **409 Conflict**: Conflicto con el estado actual del recurso
-- **422 Unprocessable Entity**: Datos de entrada inválidos
+### Client Error Codes (4xx)
+-   **400 Bad Request**: Malformed request
+-   **401 Unauthorized**: Authentication required
+-   **403 Forbidden**: Access denied
+-   **404 Not Found**: Resource not found
+-   **409 Conflict**: Conflict with the current state of the resource
+-   **422 Unprocessable Entity**: Invalid input data
 
-### Códigos de Error del Servidor (5xx)
-- **500 Internal Server Error**: Error interno del servidor
-- **502 Bad Gateway**: Error de gateway
-- **503 Service Unavailable**: Servicio no disponible
-- **504 Gateway Timeout**: Timeout del gateway
+### Server Error Codes (5xx)
+-   **500 Internal Server Error**: Internal server error
+-   **502 Bad Gateway**: Gateway error
+-   **503 Service Unavailable**: Service unavailable
+-   **504 Gateway Timeout**: Gateway timeout
 
-## Autenticación y Autorización
+## Authentication and Authorization
 
 ### JWT (JSON Web Tokens)
-Estructura de un JWT:
+Structure of a JWT:
 ```
 Header.Payload.Signature
 ```
 
-**Ejemplo de Header:**
+**Header Example:**
 ```json
 {
   "alg": "HS256",
@@ -72,37 +72,37 @@ Header.Payload.Signature
 }
 ```
 
-**Ejemplo de Payload:**
+**Payload Example:**
 ```json
 {
   "sub": "1234567890",
-  "name": "Juan Pérez",
+  "name": "John Doe",
   "iat": 1516239022,
   "exp": 1516325422
 }
 ```
 
-### Implementación de Autenticación
-1. **Bearer Token**: `Authorization: Bearer <token>`
-2. **API Keys**: `X-API-Key: <key>`
-3. **OAuth 2.0**: Para autenticación delegada
+### Authentication Implementation
+1.  **Bearer Token**: `Authorization: Bearer <token>`
+2.  **API Keys**: `X-API-Key: <key>`
+3.  **OAuth 2.0**: For delegated authentication
 
-## Manejo de Errores
+## Error Handling
 
-### Estructura de Respuesta de Error
+### Error Response Structure
 ```json
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Los datos enviados no son válidos",
+    "message": "The submitted data is not valid",
     "details": [
       {
         "field": "email",
-        "message": "El formato del email es inválido"
+        "message": "The email format is invalid"
       },
       {
-        "field": "edad",
-        "message": "La edad debe ser mayor a 0"
+        "field": "age",
+        "message": "Age must be greater than 0"
       }
     ],
     "timestamp": "2024-01-15T10:30:00Z",
@@ -111,21 +111,21 @@ Header.Payload.Signature
 }
 ```
 
-### Mejores Prácticas para Errores
-- Proporcionar códigos de error específicos
-- Incluir mensajes descriptivos en idioma del usuario
-- Agregar detalles específicos sobre campos problemáticos
-- Incluir un request_id para rastreo
-- Mantener consistencia en la estructura
+### Error Best Practices
+- Provide specific error codes
+- Include descriptive messages in the user's language
+- Add specific details about problematic fields
+- Include a `request_id` for tracking
+- Maintain consistency in the structure
 
-## Paginación
+## Pagination
 
-### Paginación Basada en Offset
+### Offset-based Pagination
 ```
-GET /api/v1/usuarios?offset=20&limit=10
+GET /api/v1/users?offset=20&limit=10
 ```
 
-**Respuesta:**
+**Response:**
 ```json
 {
   "data": [...],
@@ -139,71 +139,71 @@ GET /api/v1/usuarios?offset=20&limit=10
 }
 ```
 
-### Paginación Basada en Cursor
+### Cursor-based Pagination
 ```
-GET /api/v1/usuarios?cursor=eyJpZCI6MTAwfQ&limit=10
-```
-
-**Ventajas del cursor:**
-- Consistencia en resultados paginados
-- Mejor rendimiento para datasets grandes
-- Evita duplicados durante la paginación
-
-## Filtrado y Búsqueda
-
-### Parámetros de Consulta
-```
-GET /api/v1/productos?categoria=electronica&precio_min=100&precio_max=500&ordenar_por=precio&orden=asc
+GET /api/v1/users?cursor=eyJpZCI6MTAwfQ&limit=10
 ```
 
-### Búsqueda de Texto
+**Advantages of cursor:**
+- Consistency in paginated results
+- Better performance for large datasets
+- Avoids duplicates during pagination
+
+## Filtering and Searching
+
+### Query Parameters
 ```
-GET /api/v1/articulos?q=machine+learning&campos=titulo,contenido
+GET /api/v1/products?category=electronics&price_min=100&price_max=500&sort_by=price&order=asc
 ```
 
-## Versionado de APIs
+### Text Search
+```
+GET /api/v1/articles?q=machine+learning&fields=title,content
+```
 
-### Estrategias de Versionado
-1. **URL Path**: `/v1/usuarios`, `/v2/usuarios`
-2. **Query Parameter**: `/usuarios?version=2`
-3. **Header**: `API-Version: 2`
-4. **Accept Header**: `Accept: application/vnd.api+json;version=2`
+## API Versioning
 
-### Políticas de Deprecación
-- Mantener versiones anteriores por al menos 6 meses
-- Notificar deprecación con 3 meses de anticipación
-- Incluir headers de deprecación en respuestas
-- Proporcionar guías de migración
+### Versioning Strategies
+1.  **URL Path**: `/v1/users`, `/v2/users`
+2.  **Query Parameter**: `/users?version=2`
+3.  **Header**: `API-Version: 2`
+4.  **Accept Header**: `Accept: application/vnd.api+json;version=2`
+
+### Deprecation Policies
+- Maintain previous versions for at least 6 months
+- Notify about deprecation 3 months in advance
+- Include deprecation headers in responses
+- Provide migration guides
 
 ## Rate Limiting
 
-### Implementación
-Headers de respuesta:
+### Implementation
+Response headers:
 ```
 X-RateLimit-Limit: 1000
 X-RateLimit-Remaining: 999
 X-RateLimit-Reset: 1609459200
 ```
 
-### Estrategias de Rate Limiting
-- **Fixed Window**: Límite fijo por ventana de tiempo
-- **Sliding Window**: Ventana deslizante más precisa
-- **Token Bucket**: Permite ráfagas controladas
-- **Leaky Bucket**: Flujo constante de solicitudes
+### Rate Limiting Strategies
+-   **Fixed Window**: Fixed limit per time window
+-   **Sliding Window**: More precise sliding window
+-   **Token Bucket**: Allows controlled bursts
+-   **Leaky Bucket**: Constant flow of requests
 
-## Documentación
+## Documentation
 
 ### OpenAPI Specification
-Usar OpenAPI 3.0+ para documentar APIs:
+Use OpenAPI 3.0+ to document APIs:
 ```yaml
 openapi: 3.0.0
 info:
-  title: API de Gestión de Usuarios
+  title: User Management API
   version: 1.0.0
 paths:
-  /usuarios:
+  /users:
     get:
-      summary: Obtener lista de usuarios
+      summary: Get a list of users
       parameters:
         - name: limit
           in: query
@@ -212,7 +212,7 @@ paths:
             default: 20
 ```
 
-### Herramientas de Documentación
-- **Swagger UI**: Interfaz interactiva
-- **Redoc**: Documentación estática elegante
-- **Postman Collections**: Colecciones exportables
+### Documentation Tools
+-   **Swagger UI**: Interactive interface
+-   **Redoc**: Elegant static documentation
+-   **Postman Collections**: Exportable collections

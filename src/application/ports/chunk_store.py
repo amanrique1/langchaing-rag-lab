@@ -8,10 +8,6 @@ class ChunkStore(ABC):
         pass
 
     @abstractmethod
-    def get(self, chunk_id: str) -> Chunk | None:
-        pass
-
-    @abstractmethod
     def delete(self, chunk_id: str):
         pass
 

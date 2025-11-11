@@ -1,38 +1,38 @@
-# Políticas y Procedimientos de Desarrollo
+# Development Policies and Procedures
 
-## 1. POLÍTICA DE CONTROL DE VERSIONES
+## 1. VERSION CONTROL POLICY
 
-### 1.1 Propósito
-Establecer directrices claras para el manejo del código fuente y garantizar la trazabilidad de cambios en todos los proyectos de desarrollo.
+### 1.1 Purpose
+To establish clear guidelines for source code management and ensure the traceability of changes across all development projects.
 
-### 1.2 Alcance
-Esta política aplica a todo el personal de desarrollo, QA y DevOps involucrado en proyectos de software.
+### 1.2 Scope
+This policy applies to all development, QA, and DevOps personnel involved in software projects.
 
-### 1.3 Herramientas Aprobadas
-- **Sistema de Control de Versiones**: Git
-- **Repositorios Centralizados**: GitHub Enterprise / GitLab
-- **Herramientas de Revisión**: Pull Requests / Merge Requests
+### 1.3 Approved Tools
+- **Version Control System**: Git
+- **Centralized Repositories**: GitHub Enterprise / GitLab
+- **Review Tools**: Pull Requests / Merge Requests
 
-### 1.4 Procedimientos Obligatorios
+### 1.4 Mandatory Procedures
 
-#### 1.4.1 Estructura de Branches
-**OBLIGATORIO**: Todo proyecto debe implementar el modelo Git Flow:
-- `main/master`: Código de producción
-- `develop`: Integración de nuevas funcionalidades
-- `feature/*`: Desarrollo de nuevas características
-- `release/*`: Preparación de versiones
-- `hotfix/*`: Correcciones urgentes de producción
+#### 1.4.1 Branching Structure
+**MANDATORY**: All projects must implement the Git Flow model:
+- `main/master`: Production code
+- `develop`: Integration of new features
+- `feature/*`: Development of new features
+- `release/*`: Release preparation
+- `hotfix/*`: Urgent production fixes
 
-#### 1.4.2 Convenciones de Nomenclatura
-**FORMATO REQUERIDO** para branches:
+#### 1.4.2 Naming Conventions
+**REQUIRED FORMAT** for branches:
 ```
-feature/TICKET-123-descripcion-corta
-bugfix/TICKET-456-correccion-login
-hotfix/TICKET-789-error-critico-pago
+feature/TICKET-123-short-description
+bugfix/TICKET-456-login-fix
+hotfix/TICKET-789-critical-payment-error
 ```
 
 #### 1.4.3 Commits
-**FORMATO OBLIGATORIO** para mensajes de commit:
+**MANDATORY FORMAT** for commit messages:
 ```
 type(scope): description
 
@@ -41,187 +41,187 @@ type(scope): description
 [optional footer]
 ```
 
-**Tipos permitidos:**
-- `feat`: Nueva funcionalidad
-- `fix`: Corrección de bugs
-- `docs`: Cambios en documentación
-- `style`: Cambios de formato (sin afectar lógica)
-- `refactor`: Refactoring de código
-- `test`: Agregar o modificar tests
-- `chore`: Tareas de mantenimiento
+**Allowed types:**
+- `feat`: New functionality
+- `fix`: Bug correction
+- `docs`: Documentation changes
+- `style`: Formatting changes (without affecting logic)
+- `refactor`: Code refactoring
+- `test`: Adding or modifying tests
+- `chore`: Maintenance tasks
 
-### 1.5 Proceso de Revisión de Código
+### 1.5 Code Review Process
 
-#### 1.5.1 Requisitos Mínimos
-**OBLIGATORIO** para todos los Pull Requests:
-- Mínimo 2 revisores aprobados
-- Todos los tests automatizados exitosos
-- Coverage de código > 80%
-- Sin conflictos de merge
-- Documentación actualizada (si aplica)
+#### 1.5.1 Minimum Requirements
+**MANDATORY** for all Pull Requests:
+- Minimum of 2 approved reviewers
+- All automated tests must pass
+- Code coverage > 80%
+- No merge conflicts
+- Updated documentation (if applicable)
 
-#### 1.5.2 Criterios de Rechazo
-Un PR será rechazado automáticamente si:
-- Contiene secretos o credenciales hardcodeadas
-- No cumple con los estándares de coding definidos
-- Reduce el coverage de tests por debajo del 80%
-- No incluye tests para nueva funcionalidad
+#### 1.5.2 Rejection Criteria
+A PR will be automatically rejected if it:
+- Contains hardcoded secrets or credentials
+- Fails to meet defined coding standards
+- Reduces test coverage below 80%
+- Does not include tests for new functionality
 
-## 2. POLÍTICA DE TESTING
+## 2. TESTING POLICY
 
-### 2.1 Niveles de Testing Obligatorios
+### 2.1 Mandatory Testing Levels
 
 #### 2.1.1 Unit Tests
-**COBERTURA MÍNIMA**: 80% para todas las funciones
-**HERRAMIENTAS**: Jest, PyTest, JUnit (según tecnología)
-**RESPONSABLE**: Desarrollador que implementa la funcionalidad
+**MINIMUM COVERAGE**: 80% for all functions
+**TOOLS**: Jest, PyTest, JUnit (depending on technology)
+**RESPONSIBLE**: The developer implementing the functionality
 
 #### 2.1.2 Integration Tests
-**FRECUENCIA**: Antes de cada merge a develop
-**ALCANCE**: Interacciones entre módulos
-**RESPONSABLE**: Equipo de desarrollo
+**FREQUENCY**: Before each merge to `develop`
+**SCOPE**: Interactions between modules
+**RESPONSIBLE**: Development team
 
 #### 2.1.3 End-to-End Tests
-**FRECUENCIA**: Antes de cada release
-**HERRAMIENTAS**: Cypress, Selenium, Playwright
-**RESPONSABLE**: Equipo de QA
+**FREQUENCY**: Before each release
+**TOOLS**: Cypress, Selenium, Playwright
+**RESPONSIBLE**: QA team
 
-### 2.2 Procedimientos de Testing
+### 2.2 Testing Procedures
 
 #### 2.2.1 Test-Driven Development (TDD)
-**OBLIGATORIO** para funcionalidades críticas:
-1. Escribir test fallido
-2. Implementar código mínimo para pasar test
-3. Refactorizar manteniendo tests verdes
+**MANDATORY** for critical functionalities:
+1. Write a failing test
+2. Implement the minimum code to pass the test
+3. Refactor while keeping tests green
 
 #### 2.2.2 Continuous Testing
-**AUTOMATIZACIÓN REQUERIDA**:
-- Tests ejecutados en cada commit
-- Reporte automático de coverage
-- Notificaciones de fallos vía Slack/email
+**AUTOMATION REQUIRED**:
+- Tests run on every commit
+- Automatic coverage reporting
+- Failure notifications via Slack/email
 
-## 3. POLÍTICA DE SEGURIDAD EN EL CÓDIGO
+## 3. CODE SECURITY POLICY
 
-### 3.1 Manejo de Credenciales
+### 3.1 Credential Management
 
-#### 3.1.1 Prohibiciones Absolutas
-**TERMINANTEMENTE PROHIBIDO**:
-- Hardcodear passwords, API keys o tokens
-- Commitear archivos `.env` con datos sensibles
-- Usar credenciales de desarrollo en producción
-- Compartir credenciales por medios no seguros
+#### 3.1.1 Absolute Prohibitions
+**STRICTLY FORBIDDEN**:
+- Hardcoding passwords, API keys, or tokens
+- Committing `.env` files with sensitive data
+- Using development credentials in production
+- Sharing credentials through unsecured channels
 
-#### 3.1.2 Prácticas Obligatorias
-**DEBE IMPLEMENTARSE**:
-- Variables de entorno para configuración
-- Gestores de secretos (AWS Secrets Manager, HashiCorp Vault)
-- Rotación periódica de credenciales (cada 90 días)
-- Cifrado de datos sensibles en reposo
+#### 3.1.2 Mandatory Practices
+**MUST BE IMPLEMENTED**:
+- Environment variables for configuration
+- Secrets managers (AWS Secrets Manager, HashiCorp Vault)
+- Periodic credential rotation (every 90 days)
+- Encryption of sensitive data at rest
 
-### 3.2 Análisis de Vulnerabilidades
+### 3.2 Vulnerability Analysis
 
-#### 3.2.1 Herramientas Obligatorias
-**INTEGRACIÓN REQUERIDA** en CI/CD:
-- SonarQube para análisis de código estático
-- OWASP Dependency Check para vulnerabilidades
-- ESLint Security Plugin para JavaScript
-- Bandit para Python
+#### 3.2.1 Mandatory Tools
+**INTEGRATION REQUIRED** in CI/CD:
+- SonarQube for static code analysis
+- OWASP Dependency-Check for vulnerabilities
+- ESLint Security Plugin for JavaScript
+- Bandit for Python
 
-#### 3.2.2 Umbrales de Seguridad
-**CRITERIOS DE BLOQUEO**:
-- Vulnerabilidades CRITICAL: 0 permitidas
-- Vulnerabilidades HIGH: Máximo 2 con plan de remediación
-- Vulnerabilidades MEDIUM: Máximo 10 con seguimiento
+#### 3.2.2 Security Thresholds
+**BLOCKING CRITERIA**:
+- CRITICAL vulnerabilities: 0 allowed
+- HIGH vulnerabilities: Maximum 2 with a remediation plan
+- MEDIUM vulnerabilities: Maximum 10 with tracking
 
-## 4. POLÍTICA DE DEPLOYMENT
+## 4. DEPLOYMENT POLICY
 
-### 4.1 Ambientes Obligatorios
+### 4.1 Mandatory Environments
 
-#### 4.1.1 Ambientes Mínimos Requeridos
-1. **Development**: Para desarrollo activo
-2. **Testing/QA**: Para validación de QA
-3. **Staging**: Réplica exacta de producción
-4. **Production**: Ambiente productivo
+#### 4.1.1 Minimum Required Environments
+1.  **Development**: For active development
+2.  **Testing/QA**: For QA validation
+3.  **Staging**: Exact replica of production
+4.  **Production**: Live production environment
 
-#### 4.1.2 Configuración de Ambientes
-**REQUISITOS TÉCNICOS**:
-- Staging debe ser idéntico a producción
-- Datos de prueba anonimizados en ambientes no productivos
-- Logs centralizados en todos los ambientes
-- Monitoring y alerting configurado
+#### 4.1.2 Environment Configuration
+**TECHNICAL REQUIREMENTS**:
+- Staging must be identical to production
+- Anonymized test data in non-production environments
+- Centralized logs in all environments
+- Monitoring and alerting configured
 
-### 4.2 Proceso de Deployment
+### 4.2 Deployment Process
 
-#### 4.2.1 Pre-requisitos para Deployment
-**CHECKLIST OBLIGATORIO**:
-- [ ] Todos los tests automatizados exitosos
-- [ ] Code review completado y aprobado
-- [ ] Documentación actualizada
-- [ ] Plan de rollback definido
-- [ ] Ventana de mantenimiento aprobada (para prod)
+#### 4.2.1 Pre-deployment Prerequisites
+**MANDATORY CHECKLIST**:
+- [ ] All automated tests passed
+- [ ] Code review completed and approved
+- [ ] Documentation updated
+- [ ] Rollback plan defined
+- [ ] Maintenance window approved (for prod)
 
-#### 4.2.2 Estrategias de Deployment
-**ESTRATEGIAS APROBADAS**:
-- **Blue-Green**: Para aplicaciones críticas
-- **Rolling**: Para microservicios
-- **Canary**: Para cambios de alto riesgo
-- **Feature Flags**: Para releases graduales
+#### 4.2.2 Deployment Strategies
+**APPROVED STRATEGIES**:
+- **Blue-Green**: For critical applications
+- **Rolling**: For microservices
+- **Canary**: For high-risk changes
+- **Feature Flags**: For gradual releases
 
 ### 4.3 Rollback Procedures
 
-#### 4.3.1 Criterios de Rollback Automático
-**ACTIVACIÓN AUTOMÁTICA** cuando:
-- Error rate > 5% por más de 2 minutos
-- Response time > 5 segundos sostenido
-- Availability < 99.5% por más de 5 minutos
-- Fallas en health checks críticos
+#### 4.3.1 Automatic Rollback Criteria
+**AUTOMATIC ACTIVATION** when:
+- Error rate > 5% for more than 2 minutes
+- Sustained response time > 5 seconds
+- Availability < 99.5% for more than 5 minutes
+- Failures in critical health checks
 
-#### 4.3.2 Proceso de Rollback Manual
-**PROCEDIMIENTO DE EMERGENCIA**:
-1. Notificar al equipo via canal de emergencia
-2. Ejecutar script de rollback automatizado
-3. Verificar estado post-rollback
-4. Documentar incidente y lecciones aprendidas
+#### 4.3.2 Manual Rollback Process
+**EMERGENCY PROCEDURE**:
+1. Notify the team via the emergency channel
+2. Execute the automated rollback script
+3. Verify post-rollback status
+4. Document the incident and lessons learned
 
-## 5. CUMPLIMIENTO Y AUDITORÍA
+## 5. COMPLIANCE AND AUDITING
 
-### 5.1 Monitoreo de Cumplimiento
-**MÉTRICAS RASTREADAS**:
-- Porcentaje de PRs con revisiones requeridas
-- Tiempo promedio de resolución de vulnerabilidades
-- Adherencia a convenciones de nomenclatura
-- Coverage de tests por proyecto
+### 5.1 Compliance Monitoring
+**TRACKED METRICS**:
+- Percentage of PRs with required reviews
+- Average time to resolve vulnerabilities
+- Adherence to naming conventions
+- Test coverage per project
 
-### 5.2 Auditorías Periódicas
-**FRECUENCIA**: Trimestral
-**ALCANCE**: Revisión de cumplimiento de políticas
-**RESPONSABLE**: Arquitecto Principal y Tech Lead
+### 5.2 Periodic Audits
+**FREQUENCY**: Quarterly
+**SCOPE**: Review of policy compliance
+**RESPONSIBLE**: Principal Architect and Tech Lead
 
-### 5.3 Sanciones por Incumplimiento
-**ESCALAMIENTO PROGRESIVO**:
-1. Primera violación: Coaching y recordatorio
-2. Segunda violación: Revisión formal con manager
-3. Tercera violación: Plan de mejora obligatorio
-4. Violaciones críticas de seguridad: Escalamiento inmediato a CISO
+### 5.3 Penalties for Non-Compliance
+**PROGRESSIVE ESCALATION**:
+1. First violation: Coaching and reminder
+2. Second violation: Formal review with manager
+3. Third violation: Mandatory improvement plan
+4. Critical security violations: Immediate escalation to CISO
 
-## 6. EXCEPCIONES Y APROBACIONES
+## 6. EXCEPTIONS AND APPROVALS
 
-### 6.1 Proceso de Excepciones
-Para solicitar excepción a cualquier política:
-1. Documentar justificación técnica y de negocio
-2. Proponer medidas de mitigación de riesgos
-3. Obtener aprobación del Arquitecto Principal
-4. Establecer fecha de revisión para normalización
+### 6.1 Exception Process
+To request an exception to any policy:
+1. Document the technical and business justification
+2. Propose risk mitigation measures
+3. Obtain approval from the Principal Architect
+4. Establish a review date for normalization
 
-### 6.2 Excepciones Pre-aprobadas
-**CASOS AUTOMÁTICAMENTE APROBADOS**:
-- Hotfixes críticos de seguridad (con revisión post-deploy)
-- Patches de dependencias de seguridad
-- Cambios de configuración de emergencia
+### 6.2 Pre-approved Exceptions
+**AUTOMATICALLY APPROVED CASES**:
+- Critical security hotfixes (with post-deployment review)
+- Security dependency patches
+- Emergency configuration changes
 
 ---
 
-**Fecha de Vigencia**: 01 de Enero 2024
-**Próxima Revisión**: 01 de Julio 2024
-**Versión**: 2.1
-**Aprobado por**: CTO, Arquitecto Principal, CISO
+**Effective Date**: January 01, 2024
+**Next Review**: July 01, 2024
+**Version**: 2.1
+**Approved by**: CTO, Principal Architect, CISO
