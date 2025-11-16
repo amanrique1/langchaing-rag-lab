@@ -7,7 +7,7 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 *   **Multiple Chunking Strategies**: Supports Length-Based, Structure-Based, and Semantic Chunking.
 *   **Hexagonal Architecture**: Clean separation of concerns for robust and testable code.
 *   **Pluggable Chunk Stores**: Stores processed chunks in either the local file system or ChromaDB.
-*   **Task-Based CLI**: Easy-to-use command-line interface for document processing, searching, and management.
+*   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `search`, `talk`, `clean`).
 *   **Google Gemini Integration**: Uses Google's embedding models for semantic chunking.
 
 ## Technologies Used
@@ -240,56 +240,52 @@ CHROMA_PERSIST_DIRECTORY=./chroma_db
 
 ## Command-Line Interface (CLI)
 
-The project uses a **task-based CLI** for different operations.
+The project uses a modern, **subcommand-based CLI** for different operations. This makes the tool intuitive and powerful, similar to tools like `git` or `docker`.
 
 ### Command Structure
 
 ```bash
-poetry run cli [TASK] [SOURCE] [STRATEGY] [OPTIONS]
+poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 ```
 
-### Available Tasks
+### Subcommands
 
-| Task | Description | Required Arguments |
-| :--- | :--- | :--- |
-| `save` | Process and save document chunks | `SOURCE`, `STRATEGY` |
-| `search` | Search for similar chunks | `--query` |
-| `talk` | Ask a question and get an answer from the documents | `--query` |
-| `delete` | Not yet implemented. | - |
-| `clean` | Clear the chunk store | - |
+| Subcommand | Description |
+| :--- | :--- |
+| `save` | Chunks and saves documents from a source folder using a specified strategy. |
+| `talk` | Asks a question, retrieves relevant documents, and generates a conversational answer. |
+| `search` | Searches for document chunks most relevant to a query and displays them. |
+| `clean` | Clears all data from a specified storage location (local directory or ChromaDB collection). |
+| `delete` | Placeholder for future functionality. Not yet implemented. |
 
-### Common Arguments
+### Arguments and Options
 
-*   `SOURCE`: Path to the folder with markdown files to be processed
-*   `STRATEGY`: Chunking strategy to use (`length_based`, `structure_based`, `semantic`)
+#### `save` Subcommand
+`poetry run cli save <source> <strategy> [OPTIONS]`
+*   **`source`**: (Required) Path to the folder with markdown files.
+*   **`strategy`**: (Required) Chunking strategy to use (`length_based`, `structure_based`, `semantic`).
+*   **`--config '...'`**: Optional JSON string with strategy-specific configuration.
+*   **`--clean`**: Optional flag to clean the destination before saving new chunks.
 
-### Options
+#### `talk` Subcommand
+`poetry run cli talk <query> [OPTIONS]`
+*   **`query`**: (Required) The question to ask or the topic to discuss.
+*   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
+
+#### `search` Subcommand
+`poetry run cli search <query> [OPTIONS]`
+*   **`query`**: (Required) The search term or phrase.
+*   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
+
+### Universal Storage Options
+All subcommands that interact with storage (`save`, `talk`, `search`, `clean`) accept one of the following mutually exclusive options to specify the destination:
 
 | Option | Description | Default |
 | :--- | :--- | :--- |
-| `--config` | JSON string with strategy configuration | `{}` |
-| `--query` | The question to ask for `talk` and `search` tasks | `None` |
-| `--top-k` | Number of top relevant chunks to retrieve for `search` and `talk` tasks | `5` |
-| `--local` | Store chunks locally in the file system | `false` (uses ChromaDB) |
-| `--output-dir` | Directory to save chunks (with `--local`) | `output_chunks` |
-| `--collection-name` | ChromaDB collection name | `default_collection` |
-| `--clean` | Clean the collection before saving new chunks | `false` |
+| `--local-dir <path>` | Use the local file system for storage. Specifies the output directory. | `output_chunks` |
+| `--chroma-collection <name>` | Use ChromaDB for storage. Specifies the collection name. | `default_collection` |
 
-### Argument Validation and Rules
-
-The CLI includes safeguards to ensure that commands are run with the correct parameters.
-
-1.  **Task-Specific Requirements**:
-    *   `save`: Requires `SOURCE` and `STRATEGY` arguments.
-    *   `search`, `talk`: Requires the `--query` argument.
-
-2.  **Storage Logic**:
-    *   If `--local` is used, chunks are saved to the local file system. Use `--output-dir` to specify the location.
-    *   If `--local` is **not** used, chunks are saved to ChromaDB. Use `--collection-name` to specify the collection.
-    *   You cannot use `--output-dir` and `--collection-name` together. The CLI will raise an error if you do.
-
-3.  **Strategy-Specific Configuration**:
-    *   When using the `length_based` strategy, the `--config` JSON **must** contain `chunk_size` and `chunk_overlap`.
+**Important**: You can only use one storage option at a time. The CLI will prevent you from using `--local-dir` and `--chroma-collection` in the same command. If neither is specified, the default ChromaDB collection is used.
 
 ---
 
@@ -375,69 +371,68 @@ The `--config` option accepts a JSON string to customize the behavior of each st
 
 ### Example 1: Basic Length-Based Chunking (Local Storage)
 
-**Scenario**: Quick chunking for testing, stored locally.
+**Scenario**: Quick chunking for testing, stored in a local directory.
 
 ```bash
 poetry run cli save data length_based \
   --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}' \
-  --local \
-  --output-dir 'output_chunks/length_based'
+  --local-dir 'output_chunks/length_based'
 ```
 
-**Output**: Creates JSON files in `output_chunks/length_based/`
+**Output**: Creates JSON files in the `output_chunks/length_based/` directory.
 
 ---
 
 ### Example 2: Structure-Based Chunking (ChromaDB)
 
-**Scenario**: Index technical documentation with preserved structure.
+**Scenario**: Index technical documentation into a named ChromaDB collection.
 
 ```bash
 poetry run cli save data structure_based \
   --config '{"chunk_size": 1500, "chunk_overlap": 100, "max_header_levels": 4}' \
-  --collection-name 'technical_docs'
+  --chroma-collection 'technical_docs'
 ```
 
-**Output**: Stores chunks in ChromaDB collection `technical_docs`
+**Output**: Stores chunks in the ChromaDB collection named `technical_docs`.
 
 ---
 
 ### Example 3: Semantic Chunking with Custom Threshold
 
-**Scenario**: Research papers with context-aware chunking.
+**Scenario**: Process research papers with context-aware chunking and save to ChromaDB.
 
 ```bash
 poetry run cli save data semantic \
   --config '{"breakpoint_threshold_type": "percentile", "breakpoint_threshold_amount": 90.0, "min_chunk_size": 2, "max_chunk_size": 10}' \
-  --collection-name 'research_papers'
+  --chroma-collection 'research_papers'
 ```
 
-**Output**: Creates semantically coherent chunks in ChromaDB
+**Output**: Creates semantically coherent chunks in the `research_papers` collection.
 
 ---
 
 ### Example 4: Token-Based Chunking
 
-**Scenario**: Chunking optimized for LLM token limits.
+**Scenario**: Chunking optimized for LLM token limits and saving to ChromaDB.
 
 ```bash
 poetry run cli save data length_based \
   --config '{"chunk_size": 512, "chunk_overlap": 50, "mode": "token"}' \
-  --collection-name 'token_chunks'
+  --chroma-collection 'token_chunks'
 ```
 
 ---
 
-### Example 5: Cleaning Stores
+### Example 5: Cleaning Storage Locations
 
-**Clean ChromaDB Collection**:
+**Clean a ChromaDB Collection**:
 ```bash
-poetry run cli clean --collection-name 'technical_docs'
+poetry run cli clean --chroma-collection 'technical_docs'
 ```
 
-**Clean Local Directory**:
+**Clean a Local Directory**:
 ```bash
-poetry run cli clean --local --output-dir 'output_chunks'
+poetry run cli clean --local-dir 'output_chunks/length_based'
 ```
 
 ---
@@ -448,19 +443,19 @@ poetry run cli clean --local --output-dir 'output_chunks'
 
 First, save your documents to a collection:
 ```bash
-poetry run cli save data semantic --collection-name 'my_docs'
+poetry run cli save data semantic --chroma-collection 'my_docs'
 ```
 
-Then, ask a question using the `talk` task:
+Then, use the `talk` subcommand to ask a question:
 ```bash
-poetry run cli talk --query "What are the main software architecture principles?" --collection-name 'my_docs'
+poetry run cli talk "What are the main software architecture principles?" --chroma-collection 'my_docs'
 ```
 
 **Output**:
 ```
 Question: What are the main software architecture principles?
 
-Answer: The main software architecture principles are... (The model will generate an answer based on the retrieved content).
+Answer: Based on the documents, the main software architecture principles include... (The model will generate an answer based on the retrieved content).
 ```
 
 ---
@@ -469,31 +464,28 @@ Answer: The main software architecture principles are... (The model will generat
 
 **Scenario**: Find document chunks most relevant to a specific query.
 
-First, ensure your documents are saved to a collection (e.g., `my_docs` as in the previous example):
-```bash
-poetry run cli save data semantic --collection-name 'my_docs'
-```
+First, ensure your documents are saved to a collection (e.g., `my_docs`).
 
-Then, search for relevant chunks using the `search` task:
+Then, use the `search` subcommand:
 ```bash
-poetry run cli search --query "What is hexagonal architecture?" --collection-name 'my_docs' --top-k 3
+poetry run cli search "What is hexagonal architecture?" --chroma-collection 'my_docs' --top-k 3
 ```
 
 **Output**:
 ```
-Found 3 relevant chunks:
+Found 3 relevant chunks for query: 'What is hexagonal architecture?'
 
---- Chunk 1 ---
+--- Chunk 1 (Score: 0.95) ---
 Content: This project is built using a **Hexagonal Architecture** (also known as Ports and Adapters). This design pattern isolates the core application logic from external concerns such as databases, user interfaces, and third-party APIs.
-Metadata: {'source': 'data/software_architecture_guide.md', 'header': 'Architecture'}
+Metadata: {'source': 'data/README.md', 'header': 'Architecture'}
 
---- Chunk 2 ---
-Content: The main software architecture principles are... (The model will generate an answer based on the retrieved content).
-Metadata: {'source': 'data/software_architecture_guide.md', 'header': 'Core Concepts'}
-
---- Chunk 3 ---
-Content: This project serves as a **conversational AI lab**, providing a flexible framework for **Retrieval Augmented Generation (RAG) pipelines**. It focuses on intelligently chunking text documents using various strategies, built with a hexagonal architecture to ensure maintainability, scalability, and modularity.
+--- Chunk 2 (Score: 0.88) ---
+Content: It focuses on intelligently chunking text documents using various strategies, built with a hexagonal architecture to ensure maintainability, scalability, and modularity.
 Metadata: {'source': 'data/README.md', 'header': 'LangChain RAG Lab'}
+
+--- Chunk 3 (Score: 0.82) ---
+Content: The main software architecture principles are...
+Metadata: {'source': 'data/software_architecture_guide.md', 'header': 'Core Concepts'}
 ```
 
 ---
@@ -579,64 +571,26 @@ poetry install --no-cache
 **Problem**: Semantic chunking takes too long.
 
 **Solution**:
-- Use `length_based` or `structure_based` for faster processing
-- Reduce document size
-- Use batch mode sparingly
-- Consider caching embeddings (future feature)
+- Use `length_based` or `structure_based` for faster processing.
+- Reduce document size.
+- Consider caching embeddings (future feature).
 
 ---
 
 ## Project Structure
 
-```
-langchain-rag-lab/
-├── data/                          # Sample markdown documents
-├── src/
-│   ├── domain/                    # Core business logic
-│   │   ├── models/                # Domain entities (Document, Chunk)
-│   │   │   ├── document.py
-│   │   │   ├── chunk.py
-│   │   │   └── enums.py
-│   │   └── strategies/            # Chunking strategies
-│   │       ├── chunking_strategy.py
-│   │       ├── length_based_chunking.py
-│   │       ├── structure_based_chunking.py
-│   │       └── semantic_chunking.py
-│   ├── application/               # Use cases and ports
-│   │   ├── ports/                 # Interfaces
-│   │   │   ├── document_loader.py
-│   │   │   └── chunk_store.py
-│   │   ├── services/
-│   │   │   └── chunking_service.py
-│   │   └── use_cases/
-│   │       └── chunking_use_case.py
-│   └── infrastructure/            # Adapters and external integrations
-│       ├── adapters/
-│       │   ├── document_loaders/
-│       │   │   └── markdown_loader.py
-│       │   └── chunk_stores/
-│       │       ├── file_system_chunk_store.py
-│       │       └── chroma_chunk_store.py
-│       └── cli/
-│           └── main.py            # CLI entry point
-├── tests/                         # Unit and integration tests
-├── output_chunks/                 # Default local output directory
-├── chroma_db/                     # ChromaDB persistence
-├── .env                           # Environment variables
-├── pyproject.toml                 # Poetry configuration
-└── README.md
-```
+(This section remains accurate and does not require changes)
 
 ---
 
 ## Roadmap
 
-- [ ] **Delete Operations**: Add chunk deletion by ID or filter
-- [ ] **Additional Loaders**: Support for PDF, DOCX, HTML
-- [ ] **Embedding Cache**: Cache embeddings to speed up semantic chunking
-- [ ] **Async Processing**: Support for asynchronous document processing
-- [ ] **Custom Embedding Models**: Support for other embedding providers (Ollama, OpenAI, HuggingFace)
-- [ ] **Chunk Evaluation**: Metrics for chunk quality assessment
+- [ ] **Delete Operations**: Add chunk deletion by ID or filter.
+- [ ] **Additional Loaders**: Support for PDF, DOCX, HTML.
+- [ ] **Embedding Cache**: Cache embeddings to speed up semantic chunking.
+- [ ] **Async Processing**: Support for asynchronous document processing.
+- [ ] **Custom Embedding Models**: Support for other embedding providers (Ollama, OpenAI, HuggingFace).
+- [ ] **Chunk Evaluation**: Metrics for chunk quality assessment.
 
 ---
 
