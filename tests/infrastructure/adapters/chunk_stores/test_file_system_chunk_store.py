@@ -27,15 +27,13 @@ def test_save(chunk_store, tmp_path):
             assert data["content"] == chunk.content
             assert data["metadata"] == chunk.metadata
 
-def test_get_is_stubbed(chunk_store):
-    assert chunk_store.get("some_id") is None
-
 def test_delete_is_stubbed(chunk_store):
     # The method is a no-op, so we just call it
     chunk_store.delete("some_id")
 
 def test_search_is_stubbed(chunk_store):
-    assert chunk_store.search([0.1, 0.2]) == []
+    with pytest.raises(NotImplementedError):
+        chunk_store.search([0.1, 0.2])
 
 def test_clear_is_stubbed(chunk_store):
     # The method is a no-op, so we just call it

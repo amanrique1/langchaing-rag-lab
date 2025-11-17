@@ -2,9 +2,12 @@ import asyncio
 from ragas_evaluation.test_suite import RAGASTestSuite
 from ragas_evaluation.config import EvaluationConfig
 from src.application.use_cases.storage_use_case import StorageUseCase
-from src.domain.models.enums import StorageType
-from src.infrastructure.cli.main import run_chunking as init_env
-from src.domain.models.cli_config_classes import ChunkingConfig, StorageConfig
+from src.application.use_cases.talk_use_case import TalkUseCase
+from src.application.use_cases.chunking_use_case import ChunkingUseCase
+from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
+from src.infrastructure.adapters.language_models.google_genai_language_model import GoogleGenAILanguageModel
+from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
+from src.domain.models.cli_config_classes import ChunkingConfig
 
 async def main():
     # Custom configuration
@@ -19,20 +22,33 @@ async def main():
         enable_detailed_logging=True
     )
 
+    # Instantiate adapters
+    chunk_store = ChromaChunkStore("ragas_evaluation_store")
+    language_model = GoogleGenAILanguageModel()
+    document_loader = MarkdownDocumentLoader()
+
+    # Instantiate use cases
+    storage_use_case = StorageUseCase(chunk_store)
+    talk_use_case = TalkUseCase(language_model, chunk_store)
+    chunking_use_case = ChunkingUseCase(document_loader)
+
+    # Prepare and run chunking
     chunk_config = ChunkingConfig(
-                    source_path="data",
-                    strategy="semantic",
-                    strategy_config={}
-                )
-    store_config = StorageConfig(
-                    storage_type = StorageType.CHROMA,
-                    location = "ragas_evaluation_store"
-                )
-    init_env(chunk_config, store_config)
-    storage_handler = StorageUseCase(store_config.storage_type, store_config.location)
+        source_path="data",
+        strategy="semantic",
+        strategy_config={}
+    )
+    
+    storage_use_case.clear()
+    chunks = chunking_use_case.execute(
+        source=chunk_config.source_path,
+        strategy_name=chunk_config.strategy,
+        strategy_config=chunk_config.strategy_config
+    )
+    storage_use_case.save(chunks)
 
     # Initialize suite
-    suite = RAGASTestSuite(storage_handler, config)
+    suite = RAGASTestSuite(storage_use_case, talk_use_case, config)
 
     # Run full evaluation
     full_results = await suite.run_full_evaluation()

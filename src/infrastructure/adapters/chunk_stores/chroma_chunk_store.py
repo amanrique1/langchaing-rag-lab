@@ -9,10 +9,10 @@ from src.domain.models.chunk import Chunk
 DEFAULT_COLLECTION_NAME = "rag_docs"
 
 class ChromaChunkStore(ChunkStore):
-    def __init__(self, collection_name: str = None):
+    def __init__(self, collection_name: str = None, embedding_model: any = None):
         self.collection_name = collection_name or DEFAULT_COLLECTION_NAME
         self.persist_directory = "./chroma_db"
-        self._embeddings = None
+        self._embeddings = embedding_model
         self._vector_store = None
 
     @property

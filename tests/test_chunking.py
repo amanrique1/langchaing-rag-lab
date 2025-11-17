@@ -15,12 +15,11 @@ class TestChunking(unittest.TestCase):
         self.collection_name = "test_collection"
         self.persist_directory = "./test_chroma_db"
         self.chunk_store = ChromaChunkStore(
-            collection_name=self.collection_name,
-            persist_directory=self.persist_directory,
+            collection_name=self.collection_name
         )
         self.chunk_store.clear()
         self.document_loader = MarkdownDocumentLoader()
-        self.use_case = ChunkingUseCase(self.document_loader, self.chunk_store)
+        self.use_case = ChunkingUseCase(self.document_loader)
 
     def tearDown(self):
         if os.path.exists(self.persist_directory):
@@ -41,19 +40,20 @@ class TestChunking(unittest.TestCase):
         chunks = self.use_case.execute(
             source=self.test_data_path,
             strategy_name=strategy_name,
-            strategy_config=strategy_config,
-            loader_mode="single",
+            strategy_config=strategy_config
         )
 
         self.assertIsInstance(chunks, list)
         self.assertGreater(len(chunks), 0)
         self.assertIsInstance(chunks[0], Chunk)
 
-        retrieved_chunk = self.chunk_store.get(
-            f"{chunks[0].metadata.get('source', 'doc')}_{chunks[0].metadata.get('chunk_index', 0)}"
+        self.chunk_store.save(chunks)
+        retrieved_chunks = self.chunk_store.search(
+            query=chunks[0].content
         )
-        self.assertIsNotNone(retrieved_chunk)
-        self.assertEqual(retrieved_chunk.content, chunks[0].content)
+        self.assertIsNotNone(retrieved_chunks)
+        self.assertGreater(len(retrieved_chunks), 0)
+        self.assertEqual(retrieved_chunks[0].content, chunks[0].content)
 
 
 if __name__ == "__main__":

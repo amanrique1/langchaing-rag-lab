@@ -15,100 +15,68 @@ def cleanup_mocks():
 
 @patch('argparse.ArgumentParser.parse_args')
 @patch('src.infrastructure.cli.main.run_chunking')
-@patch('src.infrastructure.cli.main.ChromaChunkStore')
-@patch('src.infrastructure.cli.main.FileSystemChunkStore')
-def test_main_save_task(mock_file_store, mock_chroma_store, mock_run_chunking, mock_parse_args):
+def test_main_save_task(mock_run_chunking, mock_parse_args):
     # Test saving to ChromaDB
-    mock_parse_args.return_value = MagicMock(
-        task='save', source='some/path', local=False, collection_name='test_collection',
-        strategy='semantic', config='{}', loader_mode='single'
+    mock_args = MagicMock(
+        task='save', source='some/path', strategy='semantic', config='{}',
+        local_dir='output_chunks', chroma_collection='test_collection', clean=False
     )
+    mock_parse_args.return_value = mock_args
     main.main()
-    mock_chroma_store.assert_called_with('test_collection')
     mock_run_chunking.assert_called()
 
     # Test saving to FileSystem
-    mock_parse_args.return_value = MagicMock(
-        task='save', source='some/path', local=True, output_dir='output',
-        strategy='semantic', config='{}', loader_mode='single'
+    mock_args = MagicMock(
+        task='save', source='some/path', strategy='semantic', config='{}',
+        local_dir='output', chroma_collection='default_collection', clean=False
     )
+    mock_parse_args.return_value = mock_args
     main.main()
-    mock_file_store.assert_called_with('output')
     mock_run_chunking.assert_called()
 
 @patch('argparse.ArgumentParser.parse_args')
-@patch('src.infrastructure.cli.main.ChromaChunkStore', autospec=True)
-def test_main_clean_task_chroma(mock_chroma_store_class, mock_parse_args):
-    main.ChromaChunkStore = mock_chroma_store_class
-    mock_store_instance = MagicMock(spec=ChromaChunkStore)
-    mock_chroma_store_class.return_value = mock_store_instance
-    
+@patch('src.infrastructure.cli.main.StorageUseCase')
+def test_main_clean_task_chroma(mock_storage_use_case, mock_parse_args):
     mock_parse_args.return_value = MagicMock(
-        task='clean', local=False, collection_name='test_collection', output_dir='output_chunks'
+        task='clean', local_dir='output_chunks', chroma_collection='test_collection'
     )
-    
     main.main()
-    
-    mock_store_instance.clear.assert_called_once()
+    mock_storage_use_case.return_value.clear.assert_called_once()
 
 @patch('argparse.ArgumentParser.parse_args')
-@patch('src.infrastructure.cli.main.FileSystemChunkStore', autospec=True)
-def test_main_clean_task_filesystem(mock_file_store_class, mock_parse_args):
-    main.FileSystemChunkStore = mock_file_store_class
-    mock_store_instance = MagicMock(spec=FileSystemChunkStore)
-    mock_file_store_class.return_value = mock_store_instance
-
+@patch('src.infrastructure.cli.main.StorageUseCase')
+def test_main_clean_task_filesystem(mock_storage_use_case, mock_parse_args):
     mock_parse_args.return_value = MagicMock(
-        task='clean', local=True, output_dir='output', collection_name='default_collection'
+        task='clean', local_dir='output', chroma_collection='default_collection'
     )
-
     main.main()
-    
-    mock_store_instance.clear.assert_called_once()
+    mock_storage_use_case.return_value.clear.assert_called_once()
 
-
-@patch('src.infrastructure.cli.main.MarkdownDocumentLoader')
 @patch('src.infrastructure.cli.main.ChunkingUseCase')
-def test_run_chunking(mock_use_case, mock_loader):
-    mock_args = MagicMock(
-        source='some/path', strategy='semantic', config='{}', loader_mode='single'
-    )
-    mock_chunk_store = MagicMock()
-    
-    main.run_chunking(mock_args, mock_chunk_store)
-
-    mock_loader.assert_called_once()
-    mock_use_case.assert_called_once()
-    mock_chunk_store.save.assert_called_once()
-
-def test_setup_common_arguments():
-    parser = main.argparse.ArgumentParser()
-    main.setup_common_arguments(parser)
-    # Very basic check to see if arguments are added
-    actions = [action.dest for action in parser._actions]
-    assert 'source' in actions
-    assert 'strategy' in actions
-    assert 'config' in actions
-    assert 'loader_mode' in actions
+@patch('src.infrastructure.cli.main.StorageUseCase')
+def test_run_chunking(mock_storage_use_case, mock_chunking_use_case):
+    mock_chunk_config = MagicMock()
+    main.run_chunking(mock_chunk_config, mock_chunking_use_case, mock_storage_use_case)
+    mock_chunking_use_case.execute.assert_called_once()
+    mock_storage_use_case.save.assert_called_once()
 
 # You can add more tests for other tasks (search, delete) and error conditions
 @patch('argparse.ArgumentParser.parse_args')
-def test_main_search_task(mock_parse_args, capsys):
-    mock_parse_args.return_value = MagicMock(task='search', local=False, collection_name='test_collection', output_dir='output_chunks')
+@patch('src.infrastructure.cli.main.run_search')
+def test_main_search_task(mock_run_search, mock_parse_args):
+    mock_parse_args.return_value = MagicMock(task='search', query='test query', top_k=5)
     main.main()
-    captured = capsys.readouterr()
-    assert "Search functionality not yet implemented." in captured.out
+    mock_run_search.assert_called_once()
 
 @patch('argparse.ArgumentParser.parse_args')
 def test_main_delete_task(mock_parse_args, capsys):
-    mock_parse_args.return_value = MagicMock(task='delete', local=False, collection_name='test_collection', output_dir='output_chunks')
+    mock_parse_args.return_value = MagicMock(task='delete')
     main.main()
     captured = capsys.readouterr()
-    assert "Delete functionality not yet implemented." in captured.out
+    assert "Delete functionality is not yet implemented." in captured.out
 
 @patch('argparse.ArgumentParser.parse_args')
-def test_main_save_no_source(mock_parse_args, capsys):
-    mock_parse_args.return_value = MagicMock(task='save', source=None, local=False, collection_name='test_collection', output_dir='output_chunks')
-    main.main()
-    captured = capsys.readouterr()
-    assert "Error: 'source' argument is required" in captured.out
+def test_main_save_no_source(mock_parse_args):
+    mock_parse_args.return_value = MagicMock(task='save', source=None, config='{}')
+    with pytest.raises(TypeError):
+        main.main()

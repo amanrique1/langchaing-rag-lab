@@ -11,6 +11,7 @@ from ragas_evaluation.metrics_analyzer import MetricsAnalyzer
 from ragas_evaluation.utils import timing_decorator
 
 from src.application.use_cases.storage_use_case import StorageUseCase
+from src.application.use_cases.talk_use_case import TalkUseCase
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +26,7 @@ class RAGASTestSuite:
     def __init__(
         self,
         storage_handler: StorageUseCase,
+        talk_use_case: TalkUseCase,
         config: Optional[EvaluationConfig] = None
     ):
         """
@@ -32,12 +34,14 @@ class RAGASTestSuite:
 
         Args:
             storage_handler: StorageUseCase instance
+            talk_use_case: TalkUseCase instance
             config: Evaluation configuration
         """
         self.storage_handler = storage_handler
+        self.talk_use_case = talk_use_case
         self.config = config or EvaluationConfig()
 
-        self.evaluator = RAGEvaluator(self.config)
+        self.evaluator = RAGEvaluator(self.config, self.talk_use_case)
         self.analyzer = MetricsAnalyzer(self.config)
         self.dataset_generator = GroundTruthDatasetGenerator()
 

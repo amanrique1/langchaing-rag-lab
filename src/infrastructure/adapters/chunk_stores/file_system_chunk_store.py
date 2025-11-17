@@ -32,8 +32,17 @@ class FileSystemChunkStore(ChunkStore):
         if file_path.exists():
             file_path.unlink()
 
-    def search(self, query_embedding: list[float], top_k: int = 5) -> list[Chunk]:
-        raise NotImplementedError("Semantic search is not supported by FileSystemChunkStore.")
+    def search(self, query: str, top_k: int = 5) -> list[Chunk]:
+        """Performs a simple keyword search over the stored chunks."""
+        relevant_chunks = []
+        for file_path in self.output_dir.glob("*.json"):
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if query in data["content"]:
+                    relevant_chunks.append(
+                        Chunk(content=data["content"], metadata=data["metadata"])
+                    )
+        return relevant_chunks[:top_k]
 
     def clear(self):
         if self.output_dir.exists():

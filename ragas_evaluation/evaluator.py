@@ -25,8 +25,9 @@ logger = logging.getLogger(__name__)
 class RAGEvaluator:
     """Comprehensive RAG evaluation using RAGAS metrics"""
 
-    def __init__(self, config: EvaluationConfig):
+    def __init__(self, config: EvaluationConfig, talk_use_case: TalkUseCase):
         self.config = config
+        self.talk_use_case = talk_use_case
         self.llm = None
         self.embeddings = None
         self.retry_handler = RetryHandler(max_retries=config.max_retries)
@@ -43,7 +44,6 @@ class RAGEvaluator:
                 self.embeddings = GoogleGenerativeAIEmbeddings(
                     model=self.config.embedding_model
                 )
-                self.chat_handler = TalkUseCase()
                 logger.info("✓ Google AI models initialized")
             else:
                 raise NotImplementedError(
@@ -96,9 +96,9 @@ class RAGEvaluator:
                     logger.warning(f"No contexts retrieved for: {question[:50]}...")
                     contexts = ["No relevant context found"]
 
-                answer = self.chat_handler.execute(
+                answer = self.talk_use_case.execute(
                     query=question,
-                    relevant_chunks=relevant_chunks
+                    top_k=5 # You may want to configure this
                 )
 
                 dataset_entry = {

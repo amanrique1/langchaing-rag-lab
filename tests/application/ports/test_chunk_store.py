@@ -45,9 +45,6 @@ def test_abc_methods_can_be_called_via_super():
         def save(self, chunks: list[Chunk]):
             super().save(chunks)
 
-        def get(self, chunk_id: str) -> Chunk | None:
-            return super().get(chunk_id)
-
         def delete(self, chunk_id: str):
             super().delete(chunk_id)
 
@@ -60,7 +57,6 @@ def test_abc_methods_can_be_called_via_super():
     # Instantiate and call each method to hit the 'pass' lines in the ABC
     super_store = SuperCallingChunkStore()
     super_store.save([])
-    super_store.get("some_id")
     super_store.delete("some_id")
     super_store.search([0.1])
     super_store.clear()
