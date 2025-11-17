@@ -31,9 +31,29 @@ def test_delete_is_stubbed(chunk_store):
     # The method is a no-op, so we just call it
     chunk_store.delete("some_id")
 
-def test_search_is_stubbed(chunk_store):
-    with pytest.raises(NotImplementedError):
-        chunk_store.search([0.1, 0.2])
+def test_search(chunk_store, tmp_path):
+    """Tests the keyword search functionality."""
+    # Create some test files
+    chunk1 = Chunk(metadata={"chunk_index": 0}, content="hello world")
+    chunk2 = Chunk(metadata={"chunk_index": 1}, content="hello there")
+    chunk3 = Chunk(metadata={"chunk_index": 2}, content="another chunk")
+    chunk_store.save([chunk1, chunk2, chunk3])
+
+    # Search for a keyword
+    results = chunk_store.search("hello")
+    assert len(results) == 2
+    assert results[0].content in ["hello world", "hello there"]
+    assert results[1].content in ["hello world", "hello there"]
+
+def test_search_no_matches(chunk_store):
+    """Tests that search returns an empty list when no files match."""
+    results = chunk_store.search("nonexistent")
+    assert len(results) == 0
+
+def test_search_empty_directory(chunk_store):
+    """Tests that search returns an empty list when the directory is empty."""
+    results = chunk_store.search("any")
+    assert len(results) == 0
 
 def test_clear_is_stubbed(chunk_store):
     # The method is a no-op, so we just call it
