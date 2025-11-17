@@ -6,6 +6,7 @@ from src.application.use_cases.talk_use_case import TalkUseCase
 from src.application.use_cases.chunking_use_case import ChunkingUseCase
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
 from src.infrastructure.adapters.language_models.google_genai_language_model import GoogleGenAILanguageModel
+from src.infrastructure.adapters.language_models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
 from src.domain.models.cli_config_classes import ChunkingConfig
 
@@ -23,9 +24,10 @@ async def main():
     )
 
     # Instantiate adapters
-    chunk_store = ChromaChunkStore("ragas_evaluation_store")
     language_model = GoogleGenAILanguageModel()
+    embedding_model = GoogleGenAIEmbeddingModel()
     document_loader = MarkdownDocumentLoader()
+    chunk_store = ChromaChunkStore("ragas_evaluation_store", embedding_model)
 
     # Instantiate use cases
     storage_use_case = StorageUseCase(chunk_store)

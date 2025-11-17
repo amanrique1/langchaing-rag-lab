@@ -66,11 +66,13 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   `DocumentLoader`: Interface for loading documents.
     *   `ChunkStore`: Interface for storing and retrieving chunks.
     *   `LanguageModel`: Interface for interacting with a language model.
+    *   `EmbeddingModel`: Interface for generating text embeddings.
 
 *   **Infrastructure Layer** (`src/infrastructure`): Provides concrete implementations (adapters):
     *   **Document Loaders**: `MarkdownDocumentLoader`.
     *   **Chunk Stores**: `FileSystemChunkStore`, `ChromaChunkStore`.
     *   **Language Models**: `GoogleGenAILanguageModel`.
+    *   **Embedding Models**: `GoogleGenAIEmbeddingModel`.
     *   **CLI**: Command-line interface (`main.py`).
 
 ### Data Flow Overview

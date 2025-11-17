@@ -7,8 +7,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.runnables import Runnable
 from langchain_core.output_parsers import StrOutputParser
 
-# It's better to define this path logic outside the class
-# so it's configured once on module import.
 try:
     data_path = Path("assets/query_template.txt")
     if not data_path.exists():

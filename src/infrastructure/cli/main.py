@@ -16,15 +16,17 @@ from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import (
 from src.infrastructure.adapters.document_loaders.markdown_loader import (
     MarkdownDocumentLoader,
 )
+from src.infrastructure.adapters.language_models.google_genai_embedding_model import (
+    GoogleGenAIEmbeddingModel,
+)
 from src.infrastructure.adapters.language_models.google_genai_language_model import (
     GoogleGenAILanguageModel,
 )
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from src.domain.models.enums import (
     LengthBasedChunkingMode,
     SemanticChunkingThresholdType
 )
-from src.domain.models.cli_config_classes import StorageConfig, ChunkingConfig, TalkConfig
+from src.domain.models.cli_config_classes import ChunkingConfig, TalkConfig
 
 
 def run_chunking(
@@ -166,7 +168,7 @@ def main():
     if use_local:
         chunk_store = FileSystemChunkStore(args.local_dir)
     else:
-        embedding_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        embedding_model = GoogleGenAIEmbeddingModel()
         chunk_store = ChromaChunkStore(args.chroma_collection, embedding_model)
 
     # Instantiate adapters
