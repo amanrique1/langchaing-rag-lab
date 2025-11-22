@@ -176,3 +176,20 @@ def test_thread_safe_initialization_of_markdown_converter():
             t.join()
 
         mock_markitdown_class.assert_called_once()
+
+
+def test_process_file_exception_propagation(loader: MarkdownDocumentLoader):
+    """Tests that _process_file raises exceptions with proper error messages."""
+    mock_path = MagicMock(spec=Path)
+    mock_path.is_file.return_value = True
+    mock_path.suffix = ".md"
+    mock_path.name = "test.md"
+    mock_path.__str__.return_value = "/fake/path/test.md"
+
+    with patch(
+        "src.infrastructure.adapters.document_loaders.markdown_loader.UnstructuredMarkdownLoader"
+    ) as mock_loader:
+        mock_loader.return_value.load.side_effect = RuntimeError("Original error")
+
+        with pytest.raises(Exception, match="Failed to process file '/fake/path/test.md': Original error"):
+            loader._process_file(mock_path)

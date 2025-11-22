@@ -27,9 +27,25 @@ def test_save(chunk_store, tmp_path):
             assert data["content"] == chunk.content
             assert data["metadata"] == chunk.metadata
 
-def test_delete_is_stubbed(chunk_store):
-    # The method is a no-op, so we just call it
-    chunk_store.delete("some_id")
+def test_delete_existing_file(chunk_store, tmp_path):
+    """Tests that delete removes an existing chunk file."""
+    # Create a chunk file
+    chunk = Chunk(metadata={"chunk_index": 0}, content="test content")
+    chunk_store.save([chunk])
+    
+    file_path = tmp_path / "chunk_0.json"
+    assert file_path.exists()
+    
+    # Delete the file
+    chunk_store.delete("0")
+    assert not file_path.exists()
+
+
+def test_delete_nonexistent_file(chunk_store):
+    """Tests that delete handles non-existent files gracefully."""
+    # Should not raise an error
+    chunk_store.delete("nonexistent_id")
+
 
 def test_search(chunk_store, tmp_path):
     """Tests the keyword search functionality."""
