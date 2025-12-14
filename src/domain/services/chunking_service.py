@@ -9,4 +9,13 @@ class ChunkingService:
         self.chunking_strategy = chunking_strategy
 
     def chunk_documents(self, documents: List[Document]) -> List[Chunk]:
+        """
+        Chunks a list of documents using the specified chunking strategy.
+
+        Args:
+            documents: List of documents to chunk
+        
+        Returns:
+            List of chunks
+        """
         return self.chunking_strategy.chunk(documents)

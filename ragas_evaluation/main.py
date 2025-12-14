@@ -8,7 +8,7 @@ from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaCh
 from src.infrastructure.adapters.language_models.google_genai_language_model import GoogleGenAILanguageModel
 from src.infrastructure.adapters.language_models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
-from src.domain.models.cli_config_classes import ChunkingConfig
+from src.domain.models.config_classes import ChunkingConfig
 
 async def main():
     # Custom configuration

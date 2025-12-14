@@ -6,7 +6,7 @@ from src.application.ports.language_model import LanguageModel
 from src.application.ports.document_loader import DocumentLoader
 from src.application.ports.chunk_store import ChunkStore
 from src.domain.models.enums import StorageType
-from src.domain.models.cli_config_classes import StorageConfig
+from src.domain.models.config_classes import StorageConfig
 
 # Adapters
 from src.infrastructure.adapters.language_models.google_genai_embedding_model import GoogleGenAIEmbeddingModel

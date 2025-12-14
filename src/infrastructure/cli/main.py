@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from src.application.dependency_container import DependencyContainer
 from src.domain.models.enums import LengthBasedChunkingMode, SemanticChunkingThresholdType
-from src.domain.models.cli_config_classes import ChunkingConfig, QueryConfig, StorageConfig
+from src.domain.models.config_classes import ChunkingConfig, QueryConfig, StorageConfig
 
 # --- Runner Functions ---
 

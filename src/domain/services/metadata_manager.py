@@ -44,6 +44,16 @@ class MetadataManager:
     ) -> Dict[str, Any]:
         """
         Creates a standardized dictionary for the Content Collection.
+
+        Args:
+            doc_metadata: Metadata of the document
+            chunk_content: Content of the chunk
+            chunk_index: Index of the chunk
+            total_chunks: Total number of chunks
+            hierarchy: Hierarchy of the document
+        
+        Returns:
+            Standardized dictionary for the Content Collection
         """
         cls._initialize_nltk()
         
@@ -81,6 +91,12 @@ class MetadataManager:
         """
         Generates the text for the 'Metadata Collection' vector.
         Format: "File: X | Section: Y | Topics: Z"
+
+        Args:
+            metadata: Metadata dictionary
+        
+        Returns:
+            Searchable string for the 'Metadata Collection' vector
         """
         components = []
 
@@ -104,6 +120,13 @@ class MetadataManager:
     def _extract_top_keywords(cls, text: str, top_n: int = 8) -> List[str]:
         """
         Extracts significant terms, ignoring EN/ES stop words.
+
+        Args:
+            text: Text to extract keywords from
+            top_n: Number of top keywords to extract
+        
+        Returns:
+            List of top keywords
         """
         if not text:
             return []

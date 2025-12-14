@@ -3,7 +3,7 @@ import sys
 from unittest.mock import patch, MagicMock, call
 from src.infrastructure.cli import main
 from src.domain.models.enums import LengthBasedChunkingMode, SemanticChunkingThresholdType
-from src.domain.models.cli_config_classes import ChunkingConfig, QueryConfig
+from src.domain.models.config_classes import ChunkingConfig, QueryConfig
 
 
 @patch("src.infrastructure.cli.main.run_chunking")

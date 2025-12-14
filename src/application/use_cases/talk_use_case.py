@@ -1,9 +1,9 @@
 from typing import Optional
-from src.application.ports.embedding_model import EmbeddingModel
 from src.application.ports.language_model import LanguageModel
 from src.application.ports.reranker import Reranker
 from src.application.ports.chunk_store import ChunkStore
 from src.domain.services.answer_generation_service import AnswerGenerationService
+from src.domain.services.search_service import SearchService
 
 
 class TalkUseCase:
@@ -22,12 +22,16 @@ class TalkUseCase:
             chunk_store: Chunk store for vector search
             reranker: Optional[Reranker] = None
         """
+
+        # Create search service
+        self.search_service = SearchService(
+            chunk_store=chunk_store,
+            reranker=reranker
+        )
         
         # Create answer generation service
         self.answer_service = AnswerGenerationService(
-            language_model=language_model,
-            chunk_store=chunk_store,
-            reranker=reranker
+            language_model=language_model
         )
     
     def execute(
@@ -48,6 +52,11 @@ class TalkUseCase:
         Returns:
             Generated answer
         """
-        return self.answer_service.generate_answer(
+        # Get relevant chunks via search service
+        chunks = self.search_service.search(
             query, top_k, num_candidates, use_reranking
+        )
+        
+        return self.answer_service.generate_answer(
+            query, chunks
         )
