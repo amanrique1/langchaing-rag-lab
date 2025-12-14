@@ -1,8 +1,7 @@
-from typing import List, Optional
+from typing import Optional
 from src.application.ports.chunk_store import ChunkStore
 from src.application.ports.language_model import LanguageModel
 from src.application.ports.reranker import Reranker
-from src.domain.models.chunk import Chunk
 from src.domain.services.search_service import SearchService
 
 
@@ -24,7 +23,10 @@ class AnswerGenerationService:
         """
         self.language_model = language_model
         # Create search service internally to avoid service-to-service dependency
-        self.search_service = SearchService(chunk_store, language_model, reranker)
+        self.search_service = SearchService(
+            chunk_store=chunk_store,
+            reranker=reranker
+        )
     
     def generate_answer(
         self,
