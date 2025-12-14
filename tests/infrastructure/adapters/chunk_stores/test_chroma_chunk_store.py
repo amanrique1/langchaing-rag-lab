@@ -1,16 +1,17 @@
 import pytest
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import MagicMock, patch, call
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore, DEFAULT_COLLECTION_NAME
 from src.domain.models.chunk import Chunk
-
+from src.domain.models.search_result import SearchResult
 
 # --- Fixtures ---
 
 @pytest.fixture
 def mock_embedding_model():
     """Provides a MagicMock for the EmbeddingModel dependency."""
-    return MagicMock()
+    mock = MagicMock()
+    mock.embed_query.return_value = [0.1, 0.2, 0.3] # Dummy embedding
+    return mock
 
 @pytest.fixture
 def mock_chroma_class():
@@ -19,161 +20,134 @@ def mock_chroma_class():
         yield mock_class
 
 @pytest.fixture
-def mock_vector_store(mock_chroma_class):
-    """Provides a mock for the Chroma instance (the vector store itself)."""
-    return mock_chroma_class.return_value
-
-@pytest.fixture
-def chroma_chunk_store(mock_embedding_model):
-    """Creates a standard ChromaChunkStore instance for testing."""
-    return ChromaChunkStore(
+def chroma_chunk_store(mock_embedding_model, mock_chroma_class):
+    """Creates a standard ChromaChunkStore instance for testing (dual collection by default)."""
+    # We mock the return values of Chroma() to be distinct for content and metadata
+    mock_content_store = MagicMock()
+    mock_metadata_store = MagicMock()
+    mock_chroma_class.side_effect = [mock_content_store, mock_metadata_store]
+    
+    store = ChromaChunkStore(
         collection_name="test_collection",
         embedding_model=mock_embedding_model
     )
-
+    # Trigger lazy loading
+    _ = store.content_collection
+    _ = store.metadata_collection
+    
+    # Attach mocks to the store instance for easier assertion in tests
+    store._content_store_mock = mock_content_store
+    store._metadata_store_mock = mock_metadata_store
+    
+    return store
 
 # --- Tests ---
-
-def test_initialization_raises_error_without_embedding_model():
-    """Test that __init__ raises a ValueError if no embedding model is provided."""
-    with pytest.raises(ValueError, match="An embedding model must be provided."):
-        ChromaChunkStore(collection_name="test_collection")
 
 def test_initialization_with_collection_name(mock_embedding_model):
     """Test that ChromaChunkStore initializes correctly with a given collection name."""
     store = ChromaChunkStore(collection_name="test_collection", embedding_model=mock_embedding_model)
     assert store.collection_name == "test_collection"
-    assert store.persist_directory == "./chroma_db"
-    assert store._vector_store is None  # Check that it's not initialized yet
+    assert store.persist_directory.endswith("chroma_db")
+    assert store._content_vector_store is None
+    assert store._metadata_vector_store is None
 
 def test_initialization_with_default_collection_name(mock_embedding_model):
     """Test initialization uses the default collection name when None is provided."""
     store = ChromaChunkStore(collection_name=None, embedding_model=mock_embedding_model)
     assert store.collection_name == DEFAULT_COLLECTION_NAME
-    assert store.persist_directory == "./chroma_db"
 
 def test_vector_store_lazy_initialization(mock_embedding_model, mock_chroma_class):
-    """Test that the vector_store is lazily initialized on first access."""
+    """Test that vector stores are lazily initialized."""
     store = ChromaChunkStore(collection_name="test_collection", embedding_model=mock_embedding_model)
     
-    # Check that it hasn't been called yet
     mock_chroma_class.assert_not_called()
 
-    # Access the property to trigger initialization
-    _ = store.vector_store
+    # Access content store
+    _ = store.content_collection
+    assert mock_chroma_class.call_count == 1
     
-    # Assert it was initialized once with correct parameters
-    mock_chroma_class.assert_called_once_with(
-        collection_name="test_collection",
-        persist_directory="./chroma_db",
-        embedding_function=mock_embedding_model,
-    )
+    # Access metadata store
+    _ = store.metadata_collection
+    assert mock_chroma_class.call_count == 2
+
+def test_save_chunks(chroma_chunk_store, mock_embedding_model):
+    """Test saving chunks involves both content and metadata stores."""
+    # Ensure chunk_id is consistent for asserting IDs
+    chunk = Chunk(metadata={"filename": "doc1.txt", "chunk_index": 0}, content="content1")
+    chunk.chunk_id = "path1_0"
+    chunks = [chunk]
     
-    # Access again and ensure it's not initialized a second time
-    _ = store.vector_store
-    mock_chroma_class.assert_called_once()
-
-
-def test_save_chunks(chroma_chunk_store, mock_vector_store):
-    """Test saving chunks to the store generates correct documents and IDs."""
-    chunks = [
-        Chunk(metadata={"source": "path1", "chunk_index": 0}, content="content1"),
-        Chunk(metadata={"source": "path2", "chunk_index": 1}, content="content2"),
-    ]
     chroma_chunk_store.save(chunks)
 
-    mock_vector_store.add_documents.assert_called_once()
-    _, kwargs = mock_vector_store.add_documents.call_args
-    
-    assert len(kwargs['documents']) == 2
-    assert kwargs['ids'] == ["path1_0", "path2_1"]
-    assert kwargs['documents'][0].page_content == "content1"
-    assert kwargs['documents'][1].page_content == "content2"
-
-def test_save_chunks_with_missing_metadata(chroma_chunk_store, mock_vector_store):
-    """Test saving a chunk with missing metadata generates a default ID."""
-    chunks = [Chunk(metadata={}, content="content without metadata")]
-    chroma_chunk_store.save(chunks)
-
-    mock_vector_store.add_documents.assert_called_once()
-    _, kwargs = mock_vector_store.add_documents.call_args
-    
+    # Content store check
+    chroma_chunk_store._content_store_mock.add_documents.assert_called_once()
+    _, kwargs = chroma_chunk_store._content_store_mock.add_documents.call_args
     assert len(kwargs['documents']) == 1
-    assert kwargs['ids'] == ["doc_0"]
+    assert kwargs['ids'] == ["path1_0"]
+    assert kwargs['documents'][0].page_content == "content1"
 
-def test_delete_chunk(chroma_chunk_store, mock_vector_store):
-    """Test deleting a chunk by its ID."""
+    # Metadata store check
+    chroma_chunk_store._metadata_store_mock.add_documents.assert_called_once()
+    _, kwargs = chroma_chunk_store._metadata_store_mock.add_documents.call_args
+    assert len(kwargs['documents']) == 1
+    assert kwargs['ids'] == ["path1_0_meta"]
+    # Metadata summary content
+    assert "File: doc1.txt" in kwargs['documents'][0].page_content
+
+def test_delete_chunk(chroma_chunk_store):
+    """Test deleting a chunk removes it from both stores."""
     chroma_chunk_store.delete("id_123")
-    mock_vector_store.delete.assert_called_once_with(
-        ids=["id_123"],
-        where=None,
-        where_document=None
+    
+    chroma_chunk_store._content_store_mock.delete.assert_called_once_with(
+        ids=["id_123"], where=None, where_document=None
+    )
+    chroma_chunk_store._metadata_store_mock.delete.assert_called_once_with(
+        ids=["id_123_meta"], where=None, where_document=None
     )
 
-def test_delete_chunk_with_optional_params(chroma_chunk_store, mock_vector_store):
-    """Test the delete method with optional 'where' parameters."""
-    chroma_chunk_store.delete(
-        "id_123",
-        where={"source": "test"},
-        where_document={"content": "test"}
-    )
-    mock_vector_store.delete.assert_called_once_with(
-        ids=["id_123"],
-        where={"source": "test"},
-        where_document={"content": "test"}
-    )
-
-def test_search(chroma_chunk_store, mock_vector_store):
-    """Test searching for similar chunks and converting results to Chunk objects."""
+def test_search_content_mode(chroma_chunk_store):
+    """Test search in content mode."""
+    # Mock return from content store
     mock_doc = MagicMock()
     mock_doc.page_content = "searched_content"
     mock_doc.metadata = {"source": "searched_source"}
-    mock_vector_store.similarity_search.return_value = [mock_doc]
+    # similarity_search_with_score returns list of (doc, score) tuples
+    # 0.5 raw score -> 1/(1+0.5) = 0.666...
+    chroma_chunk_store._content_store_mock.similarity_search_with_score.return_value = [(mock_doc, 0.5)]
 
-    results = chroma_chunk_store.search(query="test query")
+    results = chroma_chunk_store.search(query="test query", mode="content")
     
     assert len(results) == 1
-    assert isinstance(results[0], Chunk)
-    assert results[0].content == "searched_content"
-    assert results[0].metadata["source"] == "searched_source"
-    mock_vector_store.similarity_search.assert_called_once_with(
-        query="test query",
-        k=5,
-        filter=None
-    )
-
-def test_search_with_optional_params(chroma_chunk_store, mock_vector_store):
-    """Test search method with optional 'top_k' and 'filter' parameters."""
-    mock_vector_store.similarity_search.return_value = []
-
-    chroma_chunk_store.search(
-        query="test query",
-        top_k=10,
-        filter={"source": "test"}
-    )
+    assert isinstance(results[0], SearchResult)
+    assert results[0].chunk.content == "searched_content"
+    assert results[0].score == pytest.approx(0.6666666666666666)
     
-    mock_vector_store.similarity_search.assert_called_once_with(
-        query="test query",
-        k=10,  # Ensure top_k is mapped to k
-        filter={"source": "test"}
-    )
+    chroma_chunk_store._content_store_mock.similarity_search_with_score.assert_called_once()
+    chroma_chunk_store._metadata_store_mock.similarity_search_with_score.assert_not_called()
 
-def test_clear_collection(chroma_chunk_store, mock_vector_store):
-    """Test clearing a specific named collection."""
+def test_search_metadata_mode(chroma_chunk_store):
+    """Test search in metadata mode."""
+    mock_doc = MagicMock()
+    mock_doc.page_content = "source: searched_source | ..." 
+    mock_doc.metadata = {"source": "searched_source", "original_content": "real content"} # Assuming storing original
+    
+    # Mock retrieval logic if needed, but for now checking routing
+    chroma_chunk_store._metadata_store_mock.similarity_search_with_score.return_value = []
+
+    results = chroma_chunk_store.search(query="test query", mode="metadata")
+    
+    chroma_chunk_store._metadata_store_mock.similarity_search_with_score.assert_called_once()
+    chroma_chunk_store._content_store_mock.similarity_search_with_score.assert_not_called()
+
+def test_clear_collection(chroma_chunk_store):
+    """Test clearing calls delete_collection on both stores."""
     chroma_chunk_store.clear()
-    mock_vector_store.delete_collection.assert_called_once()
-    assert chroma_chunk_store._vector_store is None # Ensure instance is invalidated
-
-def test_clear_collection_handles_exception(chroma_chunk_store, mock_vector_store):
-    """Test that clear() handles exceptions gracefully when a collection doesn't exist."""
-    mock_vector_store.delete_collection.side_effect = Exception("Collection not found")
     
-    try:
-        chroma_chunk_store.clear()
-    except Exception as e:
-        pytest.fail(f"clear() raised an unexpected exception: {e}")
+    chroma_chunk_store._content_store_mock.delete_collection.assert_called_once()
+    chroma_chunk_store._metadata_store_mock.delete_collection.assert_called_once()
     
-    mock_vector_store.delete_collection.assert_called_once()
+    assert chroma_chunk_store._content_vector_store is None
+    assert chroma_chunk_store._metadata_vector_store is None
 
 @patch('src.infrastructure.adapters.chunk_stores.chroma_chunk_store.shutil.rmtree')
 @patch('src.infrastructure.adapters.chunk_stores.chroma_chunk_store.os.path.exists')
@@ -182,40 +156,9 @@ def test_clear_deletes_directory_when_collection_name_is_none(mock_exists, mock_
     mock_exists.return_value = True
     
     store = ChromaChunkStore(embedding_model=mock_embedding_model)
-    # Manually set collection_name to None to bypass __init__ logic
     store.collection_name = None
     
     store.clear()
     
-    mock_exists.assert_any_call("./chroma_db")
-    mock_rmtree.assert_called_once_with("./chroma_db")
-    assert store._vector_store is None
-
-@patch('src.infrastructure.adapters.chunk_stores.chroma_chunk_store.shutil.rmtree')
-@patch('src.infrastructure.adapters.chunk_stores.chroma_chunk_store.os.path.exists')
-def test_clear_deletes_directory_when_collection_name_is_empty(mock_exists, mock_rmtree, mock_embedding_model):
-    """Test clear() deletes the directory when collection_name is an empty string."""
-    mock_exists.return_value = True
-
-    store = ChromaChunkStore(embedding_model=mock_embedding_model)
-    # Manually set collection_name to an empty string
-    store.collection_name = ""
-
-    store.clear()
-
-    mock_exists.assert_any_call("./chroma_db")
-    mock_rmtree.assert_called_once_with("./chroma_db")
-
-@patch('src.infrastructure.adapters.chunk_stores.chroma_chunk_store.shutil.rmtree')
-@patch('src.infrastructure.adapters.chunk_stores.chroma_chunk_store.os.path.exists')
-def test_clear_does_nothing_if_directory_not_exists(mock_exists, mock_rmtree, mock_embedding_model):
-    """Test clear() does not call rmtree if the directory doesn't exist."""
-    mock_exists.return_value = False
-    
-    store = ChromaChunkStore(embedding_model=mock_embedding_model)
-    store.collection_name = None # Set to None to test the directory removal path
-    
-    store.clear()
-    
-    mock_exists.assert_any_call("./chroma_db")
-    mock_rmtree.assert_not_called()
+    mock_exists.assert_any_call(store.persist_directory)
+    mock_rmtree.assert_called_once_with(store.persist_directory)

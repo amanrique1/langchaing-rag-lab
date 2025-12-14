@@ -28,8 +28,7 @@ def test_chunking_use_case_execute(chunking_use_case, mock_document_loader):
     chunks = chunking_use_case.execute(
         source="dummy_source",
         strategy_name=strategy_name,
-        strategy_config=strategy_config,
-        loader_mode="single",
+        strategy_config=strategy_config
     )
 
     mock_document_loader.load.assert_called_once()
@@ -44,7 +43,6 @@ def test_chunking_use_case_invalid_strategy(chunking_use_case, mock_document_loa
         chunking_use_case.execute(
             source="dummy_source",
             strategy_name="invalid_strategy",
-            strategy_config={},
-            loader_mode="single",
+            strategy_config={}
         )
 

@@ -4,6 +4,17 @@ from domain.models.document import Document
 
 
 class DocumentLoader(ABC):
+    """Document loader interface for reading, parsing and loading documents."""
+    
     @abstractmethod
     def load(self, source: str) -> List[Document]:
+        """
+        Load documents from a source.
+        
+        Args:
+            source: Source path of the documents
+            
+        Returns:
+            List of Document objects
+        """
         pass

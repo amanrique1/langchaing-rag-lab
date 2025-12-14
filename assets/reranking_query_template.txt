@@ -1,0 +1,11 @@
+You are a relevance ranking expert. Given a query and a list of text passages, rank them by relevance to the query.
+
+Query: {query}
+
+Passages:
+{passages_text}
+
+Return ONLY a JSON array of passage numbers in order of relevance (most relevant first).
+Example format: [3, 1, 5, 2, 4]
+
+Your ranking:

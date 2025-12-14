@@ -11,8 +11,8 @@ def test_chunk():
     mock_embedding_model.embed_documents.return_value = [[0.1, 0.2, 0.3]] * 5
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.PERCENTILE,
-        breakpoint_threshold_amount=0.95,
+        threshold_mode=SemanticChunkingThresholdType.PERCENTILE,
+        threshold_value=0.95,
     )
     document = Document(
         metadata={},
@@ -43,8 +43,8 @@ def test_standard_deviation_threshold():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.STANDARD_DEVIATION,
-        breakpoint_threshold_amount=1.0,
+        threshold_mode=SemanticChunkingThresholdType.STANDARD_DEVIATION,
+        threshold_value=1.0,
     )
     
     document = Document(
@@ -67,8 +67,8 @@ def test_interquartile_threshold():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.INTERQUARTILE,
-        breakpoint_threshold_amount=1.5,
+        threshold_mode=SemanticChunkingThresholdType.INTERQUARTILE,
+        threshold_value=1.5,
     )
     
     document = Document(
@@ -86,8 +86,8 @@ def test_absolute_threshold():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.ABSOLUTE,
-        breakpoint_threshold_amount=0.5,
+        threshold_mode=SemanticChunkingThresholdType.ABSOLUTE,
+        threshold_value=0.5,
     )
     
     document = Document(
@@ -105,8 +105,8 @@ def test_invalid_threshold_type():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type="INVALID_TYPE",  # Invalid type
-        breakpoint_threshold_amount=0.5,
+        threshold_mode="INVALID_TYPE",  # Invalid type
+        threshold_value=0.5,
     )
     
     document = Document(
@@ -124,8 +124,8 @@ def test_empty_document():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.PERCENTILE,
-        breakpoint_threshold_amount=95.0,
+        threshold_mode=SemanticChunkingThresholdType.PERCENTILE,
+        threshold_value=95.0,
     )
     
     document = Document(metadata={}, content="")
@@ -140,8 +140,8 @@ def test_single_sentence_document():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.PERCENTILE,
-        breakpoint_threshold_amount=95.0,
+        threshold_mode=SemanticChunkingThresholdType.PERCENTILE,
+        threshold_value=95.0,
     )
     
     document = Document(metadata={"source": "test.md"}, content="Single sentence.")
@@ -150,8 +150,8 @@ def test_single_sentence_document():
     assert chunks[0].content == "Single sentence."
 
 
-def test_max_chunk_size_enforcement():
-    """Tests that max_chunk_size is enforced."""
+def test_max_sentences_enforcement():
+    """Tests that max_sentences is enforced."""
     mock_embedding_model = MagicMock()
     # High similarity to avoid natural breaks
     mock_embedding_model.embed_documents.return_value = [
@@ -164,9 +164,9 @@ def test_max_chunk_size_enforcement():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.PERCENTILE,
-        breakpoint_threshold_amount=95.0,
-        max_chunk_size=2,  # Force chunks to break after 2 sentences
+        threshold_mode=SemanticChunkingThresholdType.PERCENTILE,
+        threshold_value=95.0,
+        max_sentences=2,  # Force chunks to break after 2 sentences
     )
     
     document = Document(
@@ -174,7 +174,7 @@ def test_max_chunk_size_enforcement():
         content="One. Two. Three. Four. Five.",
     )
     chunks = strategy.chunk([document])
-    # Should create multiple chunks due to max_chunk_size
+    # Should create multiple chunks due to max_sentences
     assert len(chunks) > 1
 
 
@@ -190,9 +190,9 @@ def test_chunk_metadata_creation():
     
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.PERCENTILE,
-        breakpoint_threshold_amount=50.0,
-        min_chunk_size=1,
+        threshold_mode=SemanticChunkingThresholdType.PERCENTILE,
+        threshold_value=50.0,
+        min_sentences=1,
     )
     
     document = Document(

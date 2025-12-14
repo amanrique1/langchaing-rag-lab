@@ -4,12 +4,21 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 
 ## Features
 
+### Core Features
 *   **Multiple Chunking Strategies**: Supports Length-Based, Structure-Based, and Semantic Chunking.
 *   **Hexagonal Architecture**: Clean separation of concerns for robust and testable code.
 *   **Pluggable Chunk Stores**: Stores processed chunks in either the local file system or ChromaDB.
 *   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `talk`, `search`, `clean`).
 *   **Google Gemini Integration**: Uses Google's embedding and language models.
 *   **RAG Evaluation**: Built-in evaluation suite using the Ragas library to measure performance.
+
+### 🚀 Enhanced RAG Architecture (NEW)
+*   **Metadata-Aware Search**: Dual ChromaDB collections for content and metadata with separate embeddings.
+*   **Ensemble Retrieval**: Combines multiple search strategies using Reciprocal Rank Fusion (RRF).
+*   **LLM-Based Reranking**: Intelligent result reordering using Google Gemini for improved relevance.
+*   **Automatic Deduplication**: Removes redundant chunks while preserving highest-scoring results.
+*   **Rich Metadata Extraction**: Automatically extracts headers, filenames, and section titles from documents.
+*   **Configurable Pipeline**: Enable/disable ensemble retrieval and reranking via CLI flags.
 
 ## Technologies Used
 
@@ -54,26 +63,75 @@ This project is designed around three core chunking strategies, each suited for 
 3.  **Semantic Chunking**:
     This advanced technique uses NLP models to split the text based on semantic similarity. It identifies topic shifts and creates chunks that are contextually coherent. It's best for unstructured or semi-structured documents where preserving meaning is crucial.
 
+4.  **Full Document Chunking**:
+    This strategy treats the entire document as a single chunk. It is useful for smaller documents or when using LLMs with very large context windows where splitting is unnecessary.
+
 ## Architecture
 
-This project is built using a **Hexagonal Architecture** (also known as Ports and Adapters). This design pattern isolates the core application logic from external concerns such as databases, user interfaces, and third-party APIs.
+This project is built using a **Hexagonal Architecture** (also known as Ports and Adapters) with a **three-layer design** for clean separation of concerns.
+
+### Three-Layer Architecture
+
+```
+┌─────────────────────────────────────────┐
+│  Entry Points (CLI, API, etc)           │
+│  - Parse arguments/requests             │
+│  - Call use cases                       │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│  Use Cases (Application Layer)          │
+│  - Create dependencies                  │
+│  - Inject into services                 │
+│  - Coordinate service calls             │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│  Services (Domain Layer)                │
+│  - Business logic                       │
+│  - Reusable components                  │
+└─────────────────────────────────────────┘
+```
+
+**Benefits:**
+- **Entry Points** are thin adapters that only parse input and call use cases
+- **Use Cases** orchestrate dependencies and coordinate services (easy to add new entry points like API)
+- **Services** contain reusable business logic that can be shared across use cases
 
 ### Layers
 
-*   **Domain Layer** (`src/domain`): Contains the business logic, data models (`Document`, `Chunk`), and abstract definitions for chunking strategies (`ChunkingStrategy`). This layer is independent of any infrastructure concerns.
+*   **Domain Layer** (`src/domain`): Contains the business logic, data models, and services.
+    *   **Models**: `Document`, `Chunk`, `SearchResult` (with relevance scores)
+    *   **Services**: 
+        *   `MetadataManager`: Central authority for normalizing metadata and generating rich context strings
+        *   `EnsembleRetrieverService`: Merges multiple search strategies using RRF (NEW)
+        *   `SearchService`: Handles ensemble retrieval and reranking (NEW)
+        *   `AnswerGenerationService`: Generates answers using search + LLM (NEW)
+        *   `StorageService`: Manages chunk storage operations (NEW)
+    *   **Strategies**: `ChunkingStrategy` implementations (Length-Based, Structure-Based, Semantic)
     
-*   **Application Layer** (`src/application`): Contains use cases (`ChunkingUseCase`, `StorageUseCase`, `TalkUseCase`) that orchestrate the flow of data and apply domain logic. Defines ports (interfaces) for external services:
-    *   `DocumentLoader`: Interface for loading documents.
-    *   `ChunkStore`: Interface for storing and retrieving chunks.
-    *   `LanguageModel`: Interface for interacting with a language model.
-    *   `EmbeddingModel`: Interface for generating text embeddings.
+*   **Application Layer** (`src/application`): Contains use cases and port interfaces.
+    *   **Use Cases** (Orchestration Layer):
+        *   `ChunkingUseCase`: Orchestrates document chunking
+        *   `StorageUseCase`: Orchestrates storage operations
+        *   `TalkUseCase`: Orchestrates Q&A with ensemble retrieval and reranking
+        *   `SearchUseCase`: Orchestrates search operations (NEW)
+    *   **Ports** (Interfaces):
+        *   `DocumentLoader`: Interface for loading documents
+        *   `ChunkStore`: Interface for storing and retrieving chunks (with scores)
+        *   `LanguageModel`: Interface for LLM interactions
+        *   `EmbeddingModel`: Interface for generating text embeddings
+        *   `Reranker`: Interface for reranking search results
 
-*   **Infrastructure Layer** (`src/infrastructure`): Provides concrete implementations (adapters):
-    *   **Document Loaders**: `MarkdownDocumentLoader`.
-    *   **Chunk Stores**: `FileSystemChunkStore`, `ChromaChunkStore`.
-    *   **Language Models**: `GoogleGenAILanguageModel`.
-    *   **Embedding Models**: `GoogleGenAIEmbeddingModel`.
-    *   **CLI**: Command-line interface (`main.py`).
+*   **Infrastructure Layer** (`src/infrastructure`): Provides concrete implementations (adapters).
+    *   **Document Loaders**: `MarkdownDocumentLoader`
+    *   **Chunk Stores**: 
+        *   `ChromaChunkStore`: Unified store managing both content and metadata collections (UPDATED)
+    *   **Language Models**: `GoogleGenAILanguageModel`, `GoogleGenAIEmbeddingModel`
+    *   **Rerankers**: 
+        *   `EncoderReranker`: Default fast reranker using cross-encoders or bi-encoders.
+        *   `LLMReranker`: Optional LLM-based result reordering for higher accuracy.
+    *   **CLI**: Command-line interface (`main.py`)
 
 ### Data Flow Overview
 
@@ -103,10 +161,11 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
          │
          ▼
 ┌─────────────────┐
-│   Chunking      │ (Strategy Pattern)
-│   Strategy      │ - Length-Based
-│                 │ - Structure-Based
+│                 │ (Strategy Pattern)
+│    Chunking     │ - Length-Based
+│    Strategy     │ - Structure-Based
 │                 │ - Semantic
+│                 │ - Full Document
 └────────┬────────┘
          │
          ▼
@@ -123,7 +182,63 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 └─────────────────┘
 ```
 
-#### Talk Command Data Flow
+#### Enhanced Talk Command Data Flow
+```
+┌─────────────────┐
+│   User Query    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│   Ensemble Retrieval Use Case       │
+└────────┬────────────────────────────┘
+         │
+         ├──────────────────┬─────────────────┐
+         ▼                  ▼                 │
+┌─────────────────┐  ┌──────────────────┐     │
+│  Content Store  │  │  Metadata Store  │     │
+│   (Semantic)    │  │   (Semantic)     │     │
+└────────┬────────┘  └────────┬─────────┘     │
+         │                    │               │
+         └──────────┬─────────┘               │
+                    ▼                         │
+         ┌─────────────────────┐              │
+         │ Reciprocal Rank     │              │
+         │ Fusion (RRF)        │              │
+         │ Score Merging       │              │
+         └──────────┬──────────┘              │
+                    ▼                         │
+         ┌─────────────────────┐              │
+         │   Deduplication     │              │
+         │   (by chunk_id)     │              │
+         └──────────┬──────────┘              │
+                    ▼                         │
+         ┌─────────────────────┐              │
+         │  Top N Candidates   │              │
+         │      (e.g., 20)     │              │
+         └──────────┬──────────┘              │
+                    ▼                         │
+         ┌─────────────────────┐              │
+         │   Reranker          │◄─────────────┘
+         │ (Encoder or LLM)    │  (if enabled)
+         └──────────┬──────────┘
+                    ▼
+         ┌─────────────────────┐
+         │   Top K Results     │
+         │      (e.g., 5)      │
+         └──────────┬──────────┘
+                    ▼
+         ┌─────────────────────┐
+         │   Language Model    │
+         │  Answer Generation  │
+         └──────────┬──────────┘
+                    ▼
+         ┌─────────────────────┐
+         │  Generated Answer   │
+         └─────────────────────┘
+```
+
+#### Single-Collection Data Flow (Fallback)
 ```
 ┌─────────────────┐
 │   User Query    │
@@ -155,6 +270,93 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 │    Answer       │
 └─────────────────┘
 ```
+
+---
+
+## Enhanced RAG Architecture Deep Dive
+
+The enhanced RAG system introduces several advanced components to improve retrieval accuracy and relevance.
+
+### Unified Dual-Collection Strategy
+
+The **ChromaChunkStore** manages **two separate ChromaDB collections** internally for each document set:
+
+1. **Content Collection** (`{collection_name}_content`): Stores full chunk content with embeddings
+2. **Metadata Collection** (`{collection_name}_metadata`): Stores searchable metadata strings with embeddings
+
+**Metadata String Format**:
+```
+filename: api_development_standards.md | section: RESTful API Design | headers: API Standards > RESTful API Design | type: markdown
+```
+
+This unified approach:
+- Automatically saves to both collections when storing chunks
+- Hides the complexity of managing dual stores
+- Allows searching either collection via `mode` parameter
+- Combines content and metadata signals for better retrieval
+
+### Ensemble Retrieval with RRF
+
+The `EnsembleRetrieverService` combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**:
+
+**Algorithm**:
+```python
+for each chunk_id in results:
+    rrf_score = 0
+    for each retriever:
+        if chunk found by retriever:
+            rrf_score += weight / (k + rank)
+    final_scores[chunk_id] = rrf_score
+```
+
+Where:
+- `k = 60` (RRF constant, balances score distribution)
+- `weight` = configurable weight for each retriever (default: 1.0)
+- `rank` = position in that retriever's results (1-indexed)
+
+**Benefits**:
+- Combines evidence from multiple sources
+- Reduces impact of outliers from any single retriever
+- No need to normalize scores across different retrieval methods
+
+### Reranking System
+
+The system supports two reranking strategies:
+
+1.  **Encoder-Based Reranking (Default)**: Uses a specialized model to score relevance between query and chunks. Fast and effective.
+2.  **LLM-Based Reranking (Optional)**: Uses Google Gemini to intelligently reorder candidates. Slower but potentially more accurate for complex queries. Use `--llm-reranking` to enable.
+
+### Metadata Extraction
+
+Chunking strategies automatically extract rich metadata:
+
+| Strategy | Extracted Metadata |
+|----------|-------------------|
+| **Semantic** | filename, headers (from content), section_title, doc_type |
+| **Structure-Based** | filename, headers (from hierarchy), section_title, doc_type |
+| **Length-Based** | filename, doc_type |
+
+**Metadata Filtering**: Lists are converted to comma-separated strings for ChromaDB compatibility.
+
+### Configuration Options
+
+The enhanced pipeline is highly configurable:
+
+| Option | Effect | Default |
+|--------|--------|--------|
+| `--ensemble` | Enable ensemble retrieval | True |
+| `--no-ensemble` | Use only content search | False |
+| `--rerank` | Enable LLM reranking | True |
+| `--no-rerank` | Skip reranking step | False |
+| `--candidates N` | Candidates before reranking | 20 |
+| `--top-k K` | Final results for answer | 5 |
+
+**Performance Profiles**:
+- **High Accuracy**: `--ensemble --rerank --candidates 20 --top-k 5` (slowest, most API calls)
+- **Balanced**: `--ensemble --no-rerank --candidates 15 --top-k 5` (good balance)
+- **Fast**: `--no-ensemble --no-rerank --top-k 5` (fastest, lowest cost)
+
+---
 
 ## Technical Deep Dive
 
@@ -267,12 +469,22 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 #### `talk` Subcommand
 `poetry run cli talk <query> [OPTIONS]`
 *   **`query`**: (Required) The question to ask or the topic to discuss.
-*   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
+*   **`--top-k <number>`**: Optional number of final chunks to use for answer generation. Default is `5`.
+*   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
+*   **`--ensemble`**: Enable ensemble retrieval (default: True).
+*   **`--no-ensemble`**: Disable ensemble retrieval, use only content search.
+*   **`--no-rerank`**: Disable reranking completely (reranking is enabled by default using Encoder).
+*   **`--llm-reranking`**: Use LLM-based reranking instead of the default Encoder-based reranking.
 
 #### `search` Subcommand
 `poetry run cli search <query> [OPTIONS]`
 *   **`query`**: (Required) The search term or phrase.
 *   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
+*   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
+*   **`--ensemble`**: Enable ensemble retrieval (default: True).
+*   **`--no-ensemble`**: Disable ensemble retrieval, use only content search.
+*   **`--no-rerank`**: Disable reranking completely (reranking is enabled by default using Encoder).
+*   **`--llm-reranking`**: Use LLM-based reranking instead of the default Encoder-based reranking.
 
 ### Universal Storage Options
 All subcommands that interact with storage (`save`, `talk`, `search`, `clean`) accept one of the following mutually exclusive options to specify the destination:
@@ -337,58 +549,293 @@ The `--config` option accepts a JSON string to customize the behavior of each st
 
 | Parameter | Type | Description | Default |
 | :--- | :--- | :--- | :--- |
-| `breakpoint_threshold_type` | string | Threshold algorithm | `percentile` |
-| `breakpoint_threshold_amount` | float | Value for the threshold type | `95.0` |
-| `min_chunk_size` | int | Min sentences per chunk | `1` |
-| `max_chunk_size` | int | Max sentences per chunk | `null` |
+| `threshold_mode` | string | Threshold algorithm | `percentile` |
+| `threshold_value` | float | Value for the threshold type | `95.0` |
+| `min_sentences` | int | Min sentences per chunk | `1` |
+| `max_sentences` | int | Max sentences per chunk | `null` |
+
+### `full_doc`
+
+No configuration parameters are required. The entire document content is used as a single chunk.
 
 ---
 
-## Examples
+## Comprehensive Testing Examples
 
-### Example 1: Basic Length-Based Chunking (Local Storage)
+This section provides complete examples to test all features with both storage backends.
 
+### Testing with ChromaDB Storage
+
+#### 1. Save with Different Strategies
 ```bash
+# Full Doc Chunking
+poetry run cli save data full_doc \
+  --chroma-collection 'full_doc_docs' \
+  --clean
+
+# Length-based
 poetry run cli save data length_based \
-  --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}' \
-  --local-dir 'output_chunks/length_based'
+  --chroma-collection 'length_docs' \
+  --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}'
+
+# Structure-based
+poetry run cli save data structure_based \
+  --chroma-collection 'structure_docs' \
+  --config '{"chunk_size": 1500, "chunk_overlap": 100}'
+
+# Semantic
+poetry run cli save data semantic \
+  --chroma-collection 'semantic_docs' \
+  --config '{"threshold_mode": "percentile", "threshold_value": 90.0}'
 ```
 
-### Example 2: Structure-Based Chunking (ChromaDB)
+#### 2. Search with ChromaDB
+```bash
+# Full enhancement
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 5 \
+  --candidates 20
 
+# Medium enhancement
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 3 \
+  --candidates 10 \
+  --no-rerank
+
+# Basic search
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 3 \
+  --single-collection \
+  --no-rerank
+```
+
+#### 3. Talk with ChromaDB
+```bash
+# High accuracy mode (LLM reranking)
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 5 \
+  --candidates 20 \
+  --llm-reranking
+
+# Standard mode (Default Encoder reranking)
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 5 \
+  --candidates 20
+
+# Balanced mode (no reranking)
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 3 \
+  --candidates 15 \
+  --no-rerank
+
+# Fast mode
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma-collection 'structure_docs' \
+  --top-k 3 \
+  --single-collection \
+  --no-rerank
+```
+
+#### 4. Clean ChromaDB Collection
+```bash
+poetry run cli clean --chroma-collection 'structure_docs'
+```
+
+---
+
+### Comparing Storage Backends
+
+Test the same query with both backends to compare results:
+
+```bash
+# Save to both backends
+poetry run cli save data structure_based \
+  --local-dir 'fs_test' \
+  --config '{"chunk_size": 1000, "chunk_overlap": 200}' \
+  --clean
+
+poetry run cli save data structure_based \
+  --chroma-collection 'chroma_test' \
+  --config '{"chunk_size": 1000, "chunk_overlap": 200}' \
+  --clean
+
+# Search with FileSystem
+poetry run cli search "What are the Server Error Codes?" \
+  --local-dir 'fs_test' \
+  --top-k 3
+
+# Search with ChromaDB
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma-collection 'chroma_test' \
+  --top-k 3
+
+# Talk with FileSystem
+poetry run cli talk "What are the Server Error Codes?" \
+  --local-dir 'fs_test' \
+  --top-k 3
+
+# Talk with ChromaDB
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma-collection 'chroma_test' \
+  --top-k 3
+```
+
+---
+
+### Performance Testing
+
+Test different configurations to find optimal settings:
+
+```bash
+# Test different chunk sizes
+for size in 500 1000 1500 2000; do
+  poetry run cli save data length_based \
+    --local-dir "chunks_${size}" \
+    --config "{\"chunk_size\": ${size}, \"chunk_overlap\": 200, \"mode\": \"character\"}" \
+    --clean
+  
+  poetry run cli search "What are the Server Error Codes?" \
+    --local-dir "chunks_${size}" \
+    --top-k 3
+done
+
+# Test different candidate counts
+for candidates in 10 20 30 40; do
+  echo "Testing with ${candidates} candidates..."
+  poetry run cli talk "What are the Server Error Codes?" \
+    --chroma-collection 'structure_docs' \
+    --candidates ${candidates} \
+    --top-k 5
+done
+```
+
+---
+
+### Testing with FileSystem Storage
+
+#### 1. Save with Length-Based Chunking
+```bash
+# Character mode
+poetry run cli save data length_based \
+  --local-dir 'output_chunks/length_based/character' \
+  --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}'
+
+# Token mode
+poetry run cli save data length_based \
+  --local-dir 'output_chunks/length_based/token' \
+  --config '{"chunk_size": 500, "chunk_overlap": 100, "mode": "token"}'
+```
+
+#### 2. Save with Structure-Based Chunking
 ```bash
 poetry run cli save data structure_based \
-  --config '{"chunk_size": 1500, "chunk_overlap": 100, "max_header_levels": 4}' \
-  --chroma-collection 'technical_docs'
+  --local-dir 'output_chunks/structure_based' \
+  --config '{"chunk_size": 1500, "chunk_overlap": 150, "max_header_levels": 4}'
 ```
 
-### Example 3: Semantic Chunking with Custom Threshold
-
+#### 3. Save with Semantic Chunking
 ```bash
+# Percentile threshold
 poetry run cli save data semantic \
-  --config '{"breakpoint_threshold_type": "percentile", "breakpoint_threshold_amount": 90.0, "min_chunk_size": 2, "max_chunk_size": 10}' \
-  --chroma-collection 'research_papers'
+  --local-dir 'output_chunks/semantic_based' \
+  --config '{"threshold_mode": "percentile", "threshold_value": 95.0, "min_sentences": 2}'
+
+# Standard deviation threshold
+poetry run cli save data semantic \
+  --local-dir 'output_chunks/semantic_based' \
+  --config '{"threshold_mode": "std", "threshold_value": 1.5, "min_sentences": 1, "max_sentences": 8}'
 ```
 
-### Example 4: Talk to Your Documents
-
-First, save your documents to a collection:
+#### 4. Search with FileSystem Storage
 ```bash
-poetry run cli save data semantic --chroma-collection 'my_docs'
+# Full enhancement (ensemble + reranking)
+poetry run cli search "What are the Server Error Codes?" \
+  --local-dir 'output_chunks/length_based/character' \
+  --top-k 5 \
+  --candidates 20
+
+# Fast search (no reranking)
+poetry run cli search "What are the Server Error Codes?" \
+  --local-dir 'output_chunks/length_based/character' \
+  --top-k 3 \
+  --no-rerank
+
+# Basic search (no ensemble, no reranking)
+poetry run cli search "What are the Server Error Codes?" \
+  --local-dir 'output_chunks/length_based/character' \
+  --top-k 3 \
+  --single-collection \
+  --no-rerank
 ```
 
-Then, use the `talk` subcommand to ask a question:
+#### 5. Talk with FileSystem Storage
 ```bash
-poetry run cli talk "What are the main software architecture principles?" --chroma-collection 'my_docs'
+# Full enhancement
+poetry run cli talk "What are the Server Error Codes?" \
+  --local-dir 'output_chunks/length_based/character' \
+  --top-k 5 \
+  --candidates 20
+
+# Balanced mode (no reranking)
+poetry run cli talk "What are the Server Error Codes?" \
+  --local-dir 'output_chunks/length_based/character' \
+  --top-k 3 \
+  --candidates 15 \
+  --no-rerank
+
+# Fast mode
+poetry run cli talk "What are the Server Error Codes?" \
+  --local-dir 'output_chunks/length_based/character' \
+  --top-k 3 \
+  --single-collection \
+  --no-rerank
 ```
 
-### Example 5: Search for Relevant Chunks
-
-First, ensure your documents are saved to a collection (e.g., `my_docs`).
-
-Then, use the `search` subcommand:
+#### 6. Clean FileSystem Storage
 ```bash
-poetry run cli search "What is hexagonal architecture?" --chroma-collection 'my_docs' --top-k 3
+poetry run cli clean --local-dir 'output_chunks/length_based/character'
+```
+
+---
+
+### Full Workflow Example
+
+Complete workflow from scratch:
+
+```bash
+# 1. Clean any existing data
+poetry run cli clean --local-dir 'demo_chunks'
+
+# 2. Save documents with semantic chunking
+poetry run cli save data semantic \
+  --local-dir 'demo_chunks' \
+  --config '{"threshold_mode": "percentile", "threshold_value": 95.0, "min_sentences": 2}'
+
+# 3. Search for relevant chunks
+poetry run cli search "What are the Server Error Codes?" \
+  --local-dir 'demo_chunks' \
+  --top-k 5 \
+  --candidates 20
+
+# 4. Ask questions
+poetry run cli talk "What are the Server Error Codes?" \
+  --local-dir 'demo_chunks' \
+  --top-k 5 \
+  --candidates 20
+
+poetry run cli talk "What are the Server Error Codes?" \
+  --local-dir 'demo_chunks' \
+  --top-k 3 \
+  --no-rerank
+
+# 5. Clean up
+poetry run cli clean --local-dir 'demo_chunks'
 ```
 
 ---
@@ -445,11 +892,4 @@ poetry run ruff format .
 ```bash
 # Create .env file
 echo "GOOGLE_API_KEY=your_key_here" > .env
-```
-
-#### 2. **"NLTK punkt tokenizer not found"**
-
-**Solution**:
-```bash
-poetry run python -c "import nltk; nltk.download('punkt')"
 ```

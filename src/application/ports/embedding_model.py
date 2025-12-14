@@ -3,6 +3,8 @@ from typing import List
 
 
 class EmbeddingModel(ABC):
+    """Embedding model interface for generating embeddings."""
+    
     @abstractmethod
     def embed_query(self, text: str) -> List[float]:
         """

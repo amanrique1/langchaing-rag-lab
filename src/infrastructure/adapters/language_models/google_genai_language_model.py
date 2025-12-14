@@ -22,9 +22,10 @@ class GoogleGenAILanguageModel(LanguageModel):
     def __init__(self, model_name: str = "gemini-2.5-flash", temperature: float = 0.0):
         # The chain is the core of your use case. Define it once.
         # This is a sequence of operations: prompt -> model -> output_parser
+        self.model = ChatGoogleGenerativeAI(model=model_name, temperature=temperature)
         self.chain: Runnable = (
             ChatPromptTemplate.from_template(QUERY_TEMPLATE_CONTENT)
-            | ChatGoogleGenerativeAI(model=model_name, temperature=temperature)
+            | self.model
             | StrOutputParser()
         )
 

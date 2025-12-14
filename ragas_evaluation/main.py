@@ -23,15 +23,25 @@ async def main():
         enable_detailed_logging=True
     )
 
-    # Instantiate adapters
+    # Instantiate shared models
     language_model = GoogleGenAILanguageModel()
     embedding_model = GoogleGenAIEmbeddingModel()
     document_loader = MarkdownDocumentLoader()
-    chunk_store = ChromaChunkStore("ragas_evaluation_store", embedding_model)
 
-    # Instantiate use cases
-    storage_use_case = StorageUseCase(chunk_store)
-    talk_use_case = TalkUseCase(language_model, chunk_store)
+    # Create use cases with orchestration layer
+    storage_use_case = StorageUseCase(
+        collection_name="ragas_evaluation_store",
+        embedding_model=embedding_model,
+        use_ensemble=False  # Disable ensemble for evaluation
+    )
+    
+    talk_use_case = TalkUseCase(
+        collection_name="ragas_evaluation_store",
+        embedding_model=embedding_model,
+        language_model=language_model,
+        use_ensemble=False  # Disable ensemble for evaluation
+    )
+    
     chunking_use_case = ChunkingUseCase(document_loader)
 
     # Prepare and run chunking

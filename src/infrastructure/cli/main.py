@@ -4,41 +4,24 @@ import sys
 
 from dotenv import load_dotenv
 
-from src.application.use_cases.chunking_use_case import ChunkingUseCase
-from src.application.use_cases.storage_use_case import StorageUseCase
-from src.application.use_cases.talk_use_case import TalkUseCase
-from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import (
-    ChromaChunkStore,
-)
-from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import (
-    FileSystemChunkStore,
-)
-from src.infrastructure.adapters.document_loaders.markdown_loader import (
-    MarkdownDocumentLoader,
-)
-from src.infrastructure.adapters.language_models.google_genai_embedding_model import (
-    GoogleGenAIEmbeddingModel,
-)
-from src.infrastructure.adapters.language_models.google_genai_language_model import (
-    GoogleGenAILanguageModel,
-)
+from src.application.dependency_container import DependencyContainer
 from src.domain.models.enums import (
     LengthBasedChunkingMode,
     SemanticChunkingThresholdType
 )
-from src.domain.models.cli_config_classes import ChunkingConfig, TalkConfig
-
+from src.domain.models.cli_config_classes import ChunkingConfig, QueryConfig
 
 def run_chunking(
     chunk_config: ChunkingConfig,
-    chunking_use_case: ChunkingUseCase,
-    storage_use_case: StorageUseCase,
+    container: DependencyContainer,
+    collection_name: str = None,
+    local_dir: str = None,
+    dual_collection: bool = True,
 ):
     """
     Loads documents, chunks them according to a strategy, and saves them.
     """
-    # Make a copy to avoid mutating the original dictionary
-    strategy_params = chunk_config.strategy_config.copy()
+    strategy_params = chunk_config.strategy_config
 
     # Safely convert string representations to Enum members
     if chunk_config.strategy == "length_based" and "mode" in strategy_params:
@@ -47,53 +30,92 @@ def run_chunking(
         except ValueError as e:
             raise ValueError(f"Invalid 'mode' for length_based strategy: {e}") from e
 
-    if chunk_config.strategy == "semantic" and "breakpoint_threshold_type" in strategy_params:
+    if chunk_config.strategy == "semantic" and "threshold_mode" in strategy_params:
         try:
-            strategy_params["breakpoint_threshold_type"] = SemanticChunkingThresholdType(
-                strategy_params["breakpoint_threshold_type"]
+            strategy_params["threshold_mode"] = SemanticChunkingThresholdType(
+                strategy_params["threshold_mode"]
             )
         except ValueError as e:
-            raise ValueError(f"Invalid 'breakpoint_threshold_type' for semantic strategy: {e}") from e
+            raise ValueError(f"Invalid 'threshold_mode' for semantic strategy: {e}") from e
 
     print(f"Running chunking strategy '{chunk_config.strategy}' on '{chunk_config.source_path}'...")
+    
+    # Get use cases from container
+    chunking_use_case = container.get_chunking_use_case()
+    storage_use_case = container.get_storage_use_case(
+        collection_name=collection_name,
+        local_dir=local_dir,
+        dual_collection=dual_collection
+    )
+    
     chunks = chunking_use_case.execute(
         chunk_config.source_path, chunk_config.strategy, strategy_params
     )
     storage_use_case.save(chunks)
 
-    print(f"Successfully processed and saved {len(chunks)} chunks.")
+    print(f"Successfully processed and saved {len(chunks)} chunks to content and metadata stores.")
 
 
-def run_talk(talk_config: TalkConfig, talk_use_case: TalkUseCase):
+def run_talk(talk_config: QueryConfig, container: DependencyContainer, collection_name: str = None, local_dir: str = None, dual_collection: bool = True, use_llm_reranking: bool = False):
     """
     Searches for relevant chunks and generates an answer based on a query.
     """
     print(f"Question: {talk_config.query}")
+    
+    talk_use_case = container.get_talk_use_case(
+        collection_name=collection_name,
+        local_dir=local_dir,
+        dual_collection=dual_collection,
+        use_llm_reranking=use_llm_reranking
+    )
 
-    answer = talk_use_case.execute(talk_config.query, talk_config.top_k)
+    answer = talk_use_case.execute(
+        talk_config.query,
+        talk_config.top_k,
+        talk_config.num_candidates,
+        use_reranking=talk_config.use_reranking
+    )
 
     print(f"\nAnswer: {answer}")
 
 
-def run_search(talk_config: TalkConfig, storage_use_case: StorageUseCase):
+def run_search(search_config: QueryConfig, container: DependencyContainer, collection_name: str = None, local_dir: str = None, dual_collection: bool = True, use_llm_reranking: bool = False):
     """
     Performs a search for relevant chunks and displays them.
     """
-    relevant_chunks = storage_use_case.search(talk_config.query, talk_config.top_k)
+    search_use_case = container.get_search_use_case(
+        collection_name=collection_name,
+        local_dir=local_dir,
+        dual_collection=dual_collection,
+        use_llm_reranking=use_llm_reranking
+    )
+    
+    chunks = search_use_case.execute(
+        query=search_config.query,
+        top_k=search_config.top_k,
+        num_candidates=search_config.num_candidates,
+        use_reranking=search_config.use_reranking
+    )
 
-    if relevant_chunks:
-        print(f"Found {len(relevant_chunks)} relevant chunks for query: '{talk_config.query}'")
-        for i, chunk in enumerate(relevant_chunks):
-            print(f"\n--- Chunk {i+1} (Score: {chunk.score if hasattr(chunk, 'score') else 'N/A'}) ---")
-            print(f"Content: {chunk.content}")
+    if chunks:
+        print(f"Found {len(chunks)} relevant chunks for query: '{search_config.query}'")
+        for i, chunk in enumerate(chunks):
+            print(f"\n--- Chunk {i+1} ---")
+            print(f"Content: {chunk.content[:200]}...")
             print(f"Metadata: {chunk.metadata}")
     else:
         print("No relevant chunks found.")
 
 
-def clean_storage(storage_use_case: StorageUseCase):
+def clean_storage(container: DependencyContainer, collection_name: str = None, local_dir: str = None, dual_collection: bool = True):
     """Clears all data from the specified storage location."""
-    print("Clearing storage...")
+    print("Clearing storage (content and metadata)...")
+    
+    storage_use_case = container.get_storage_use_case(
+        collection_name=collection_name,
+        local_dir=local_dir,
+        dual_collection=dual_collection
+    )
     storage_use_case.clear()
     print("Storage cleared successfully.")
 
@@ -115,17 +137,36 @@ def setup_arg_parser():
     parser_save.add_argument("source", help="Path to the folder with markdown files.")
     parser_save.add_argument(
         "strategy",
-        choices=["length_based", "structure_based", "semantic"],
+        choices=["length_based", "structure_based", "semantic","full_doc"],
         help="Chunking strategy.",
     )
     parser_save.add_argument("--config", default="{}", help="JSON string with strategy configuration.")
     parser_save.add_argument("--clean", action="store_true", help="Clean the destination before saving.")
+    parser_save.add_argument(
+        "--single-collection", dest="dual_collection", action="store_false", default=True,
+        help="Use single collection mode instead of dual collection (dual collection enabled by default)."
+    )
 
     # --- 'talk' command ---
     parser_talk = subparsers.add_parser("talk", help="Ask a question about the documents.")
     parser_talk.add_argument("query", help="Query string for searching.")
     parser_talk.add_argument(
-        "--top-k", type=int, default=5, help="Number of top relevant chunks to retrieve."
+        "--top-k", type=int, default=5, help="Number of top relevant chunks to use for answer generation."
+    )
+    parser_talk.add_argument(
+        "--candidates", type=int, default=20, help="Number of candidates to retrieve before reranking."
+    )
+    parser_talk.add_argument(
+        "--single-collection", dest="dual_collection", action="store_false", default=True,
+        help="Use single collection mode instead of dual collection (dual collection enabled by default)."
+    )
+    parser_talk.add_argument(
+        "--no-rerank", dest="rerank", action="store_false", default=True,
+        help="Disable LLM-based reranking (enabled by default)."
+    )
+    parser_talk.add_argument(
+        "--llm-reranking", dest="llm_reranking", action="store_true", default=False,
+        help="Use LLM-based reranking instead of default Encoder-based reranking."
     )
 
     # --- 'search' command ---
@@ -134,84 +175,126 @@ def setup_arg_parser():
     parser_search.add_argument(
         "--top-k", type=int, default=5, help="Number of top relevant chunks to retrieve."
     )
+    parser_search.add_argument(
+        "--candidates", type=int, default=20, help="Number of candidates to retrieve before reranking."
+    )
+    parser_search.add_argument(
+        "--single-collection", dest="dual_collection", action="store_false", default=True,
+        help="Use single collection mode instead of dual collection (dual collection enabled by default)."
+    )
+    parser_search.add_argument(
+        "--no-rerank", dest="rerank", action="store_false", default=True,
+        help="Disable LLM-based reranking (enabled by default)."
+    )
+    parser_search.add_argument(
+        "--llm-reranking", dest="llm_reranking", action="store_true", default=False,
+        help="Use LLM-based reranking instead of default Encoder-based reranking."
+    )
 
     # --- 'clean' command ---
-    subparsers.add_parser("clean", help="Clean the storage location.")
+    parser_clean = subparsers.add_parser("clean", help="Clean the storage location.")
+    parser_clean.add_argument(
+        "--single-collection", dest="dual_collection", action="store_false", default=True,
+        help="Use single collection mode instead of dual collection (dual collection enabled by default)."
+    )
 
     # --- 'delete' command (placeholder) ---
     subparsers.add_parser("delete", help="Delete specific documents (not implemented).")
 
     # --- Common arguments for all subparsers ---
-    for sub_parser in [parser_save, parser_talk, parser_search, subparsers.choices["clean"]]:
+    for sub_parser in [parser_save, parser_talk, parser_search, parser_clean]:
         storage_group = sub_parser.add_mutually_exclusive_group()
-        storage_group.add_argument(
-            "--local-dir", help="Use local file system storage at this directory.", default="output_chunks"
-        )
         storage_group.add_argument(
             "--chroma-collection",
             help="Use ChromaDB collection with this name.",
-            default="default_collection",
+            default=None,
+        )
+        storage_group.add_argument(
+            "--local-dir",
+            help="Use FileSystem storage with this directory path.",
+            default=None,
         )
 
     return parser
 
 
 def main():
-    """Main entry point for the script."""
+    """Main entry point for the script - uses DI Container for all dependencies."""
     load_dotenv()
     parser = setup_arg_parser()
     args = parser.parse_args()
-
-    # Determine storage configuration from common arguments
-    # The mutually exclusive group ensures only one is chosen.
-    use_local = "local_dir" in args and args.local_dir != "output_chunks"
-    if use_local:
-        chunk_store = FileSystemChunkStore(args.local_dir)
-    else:
-        embedding_model = GoogleGenAIEmbeddingModel()
-        chunk_store = ChromaChunkStore(args.chroma_collection, embedding_model)
-
-    # Instantiate adapters
-    document_loader = MarkdownDocumentLoader()
-    language_model = GoogleGenAILanguageModel()
-
-    # Instantiate use cases and inject dependencies
-    chunking_use_case = ChunkingUseCase(document_loader)
-    storage_use_case = StorageUseCase(chunk_store)
-    talk_use_case = TalkUseCase(language_model, chunk_store)
-
+    
+    # Default to ChromaDB if neither storage option is specified
+    if not args.chroma_collection and not args.local_dir:
+        args.chroma_collection = "default_collection"
+    
+    # Create dependency container (manages all component lifecycle)
+    container = DependencyContainer()
+    
     try:
         # --- Task Dispatching ---
         if args.task == "save":
             if args.clean:
-                clean_storage(storage_use_case)
-
+                clean_storage(container, args.chroma_collection, args.local_dir, args.dual_collection)
+            
             # Validate JSON config
             try:
                 strategy_config_dict = json.loads(args.config)
             except json.JSONDecodeError as e:
                 raise ValueError(f"Error: Invalid JSON in --config string. Details: {e}") from e
-
+            
+            # Safely convert string representations to Enum members
+            strategy_params = strategy_config_dict
+            if args.strategy == "length_based" and "mode" in strategy_params:
+                try:
+                    strategy_params["mode"] = LengthBasedChunkingMode(strategy_params["mode"])
+                except ValueError as e:
+                    raise ValueError(f"Invalid 'mode' for length_based strategy: {e}") from e
+            
+            if args.strategy == "semantic" and "threshold_mode" in strategy_params:
+                try:
+                    strategy_params["threshold_mode"] = SemanticChunkingThresholdType(
+                        strategy_params["threshold_mode"]
+                    )
+                except ValueError as e:
+                    raise ValueError(f"Invalid 'threshold_mode' for semantic strategy: {e}") from e
+            
+            # Execute chunking
             chunk_config = ChunkingConfig(
                 source_path=args.source,
                 strategy=args.strategy,
-                strategy_config=strategy_config_dict,
+                strategy_config=strategy_params,
             )
-            run_chunking(chunk_config, chunking_use_case, storage_use_case)
-
-        elif args.task in ["talk", "search"]:
-            talk_config = TalkConfig(query=args.query, top_k=args.top_k)
-            if args.task == "talk":
-                run_talk(talk_config, talk_use_case)
-            else:
-                run_search(talk_config, storage_use_case)
-
+            run_chunking(chunk_config, container, args.chroma_collection, args.local_dir, args.dual_collection)
+        
+        elif args.task == "search":
+            # Create config with reranking flag
+            search_config = QueryConfig(
+                query=args.query,
+                top_k=args.top_k,
+                num_candidates=args.candidates
+            )
+            search_config.use_reranking = args.rerank
+            
+            run_search(search_config, container, args.chroma_collection, args.local_dir, args.dual_collection, args.llm_reranking)
+        
+        elif args.task == "talk":
+            # Create config with reranking flag
+            talk_config = QueryConfig(
+                query=args.query,
+                top_k=args.top_k,
+                num_candidates=args.candidates
+            )
+            talk_config.use_reranking = args.rerank
+            
+            run_talk(talk_config, container, args.chroma_collection, args.local_dir, args.dual_collection, args.llm_reranking)
+        
         elif args.task == "clean":
-            clean_storage(storage_use_case)
-
+            clean_storage(container, args.chroma_collection, args.local_dir, args.dual_collection)
+        
         elif args.task == "delete":
             print("Delete functionality is not yet implemented.")
-
+    
     except (ValueError, FileNotFoundError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

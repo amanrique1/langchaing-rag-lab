@@ -1,34 +1,34 @@
-from typing import Optional
+from typing import List, Optional
 from src.application.ports.embedding_model import EmbeddingModel
-from src.application.ports.language_model import LanguageModel
 from src.application.ports.reranker import Reranker
 from src.application.ports.chunk_store import ChunkStore
+from src.domain.models.chunk import Chunk
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
 from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import FileSystemChunkStore
-from src.domain.services.answer_generation_service import AnswerGenerationService
+from src.domain.services.search_service import SearchService
 
 
-class TalkUseCase:
-    """Orchestrates answer generation - coordinates dependencies and services."""
+class SearchUseCase:
+    """Orchestrates search operation - coordinates dependencies and services.
+    Organize the embedding, retrieval, ensemble and reranking steps.
+    """
     
     def __init__(
         self,
         embedding_model: EmbeddingModel,
-        language_model: LanguageModel,
         collection_name: Optional[str] = None,
         local_dir: Optional[str] = None,
         dual_collection: bool = True,
         reranker: Optional[Reranker] = None
     ):
-        """Initialize talk use case with dependencies.
+        """Initialize search use case with dependencies.
         
         Args:
             embedding_model: Embedding model for vector search
-            language_model: Language model for answer generation
             collection_name: Name of the Chroma collection (for ChromaDB)
             local_dir: Directory path (for FileSystem storage)
             dual_collection: Whether to enable dual collection storage
-            reranker: Optional reranker for answer generation
+            reranker: Optional reranker for search refinement
         """
         # Create appropriate chunk store based on provided parameters
         chunk_store: ChunkStore
@@ -49,9 +49,8 @@ class TalkUseCase:
         
         self.chunk_store = chunk_store
         
-        # Create answer generation service
-        self.answer_service = AnswerGenerationService(
-            language_model=language_model,
+        # Create search service with dependencies
+        self.search_service = SearchService(
             chunk_store=self.chunk_store,
             reranker=reranker
         )
@@ -62,18 +61,18 @@ class TalkUseCase:
         top_k: int = 5,
         num_candidates: int = 20,
         use_reranking: bool = True
-    ) -> str:
-        """Execute answer generation - delegates to answer service.
+    ) -> List[Chunk]:
+        """Execute search - delegates to search service.
         
         Args:
-            query: User's question
-            top_k: Number of chunks for answer generation
+            query: Search query
+            top_k: Number of final results
             num_candidates: Number of candidates before reranking
             use_reranking: Whether to use LLM reranking
             
         Returns:
-            Generated answer
+            List of relevant chunks
         """
-        return self.answer_service.generate_answer(
+        return self.search_service.search(
             query, top_k, num_candidates, use_reranking
         )

@@ -64,8 +64,8 @@ def test_semantic_chunking(sample_document):
     ]
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
-        breakpoint_threshold_type=SemanticChunkingThresholdType.ABSOLUTE,
-        breakpoint_threshold_amount=0.5,
+        threshold_mode=SemanticChunkingThresholdType.ABSOLUTE,
+        threshold_value=0.5,
     )
     chunks = strategy.chunk([sample_document])
     assert len(chunks) > 0

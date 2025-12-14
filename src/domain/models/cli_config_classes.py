@@ -17,7 +17,9 @@ class ChunkingConfig:
     strategy_config: Dict[str, Any]
 
 @dataclass
-class TalkConfig:
-    """Configuration for the 'talk' or 'search' tasks."""
+class QueryConfig:
+    """Configuration for query-based tasks (search and talk)."""
     query: str
     top_k: int
+    num_candidates: int = 20
+    use_reranking: bool = True
