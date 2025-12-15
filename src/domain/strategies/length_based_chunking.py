@@ -48,11 +48,8 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
 
     def chunk(self, documents: List[Document]) -> List[Chunk]:
         """
-        Splits a list of domain Documents into smaller Chunks.
-
-        This method converts domain Documents into LangChain format to leverage
-        LangChain's splitting logic, then converts the results back into domain
-        Chunk objects. It also enriches the metadata with chunk indexing information.
+        Splits a list of domain Documents into smaller Chunks. 
+        It also enriches the metadata with chunk indexing information.
 
         Args:
             documents (List[Document]): A list of domain Document objects to be split.

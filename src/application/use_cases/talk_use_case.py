@@ -2,7 +2,6 @@ from typing import Optional
 from src.application.ports.language_model import LanguageModel
 from src.application.ports.reranker import Reranker
 from src.application.ports.chunk_store import ChunkStore
-from src.domain.services.answer_generation_service import AnswerGenerationService
 from src.domain.services.search_service import SearchService
 
 
@@ -30,9 +29,7 @@ class TalkUseCase:
         )
         
         # Create answer generation service
-        self.answer_service = AnswerGenerationService(
-            language_model=language_model
-        )
+        self.language_model = language_model
     
     def execute(
         self,
@@ -56,7 +53,10 @@ class TalkUseCase:
         chunks = self.search_service.search(
             query, top_k, num_candidates, use_reranking
         )
+
+        if not chunks:
+            return "No relevant chunks found."
         
-        return self.answer_service.generate_answer(
+        return self.language_model.get_answer(
             query, chunks
         )

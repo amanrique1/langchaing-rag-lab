@@ -1,6 +1,5 @@
 from typing import List, Dict, Any
 from application.ports.document_loader import DocumentLoader
-from src.domain.services.chunking_service import ChunkingService
 from src.domain.strategies.chunking_strategy import ChunkingStrategy
 from src.domain.strategies.full_doc_chunking import FullDocChunkingStrategy
 from src.domain.strategies.semantic_chunking import SemanticChunkingStrategy
@@ -71,10 +70,7 @@ class ChunkingUseCase:
         # Instantiate the strategy with the provided configuration
         strategy = strategy_class(**strategy_config)
         
-        # Initialize domain service with the chosen strategy
-        chunking_service = ChunkingService(strategy)
-
         documents = self.document_loader.load(source)
-        chunks = chunking_service.chunk_documents(documents)
+        chunks = strategy.chunk(documents)
         
         return chunks

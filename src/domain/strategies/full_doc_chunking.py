@@ -12,19 +12,7 @@ class FullDocChunkingStrategy(ChunkingStrategy):
 
     This strategy performs a 1-to-1 mapping: each input Document is converted 
     into exactly one Chunk. No splitting or text modification occurs.
-    
-    This is ideal for:
-    1. Documents that are already small (e.g., emails, social media posts).
-    2. Scenarios utilizing LLMs with large context windows where splitting is unnecessary.
     """
-
-    def __init__(self):
-        """
-        Initialize the whole-document chunking strategy.
-        
-        No configuration parameters are required for this strategy.
-        """
-        pass
 
     def chunk(self, documents: List[Document]) -> List[Chunk]:
         """
@@ -41,7 +29,6 @@ class FullDocChunkingStrategy(ChunkingStrategy):
         
         for doc in documents:
             # Attempt to find a "Title" (H1) to act as the hierarchy context
-            # Since it's a full doc, the 'hierarchy' is just the document title.
             title = self._extract_h1_title(doc.content)
             hierarchy = [title] if title else []
 
