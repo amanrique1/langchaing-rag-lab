@@ -4,7 +4,7 @@ from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from src.domain.models.document import Document
+from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
 from src.domain.strategies.chunking_strategy import ChunkingStrategy
 from src.domain.services.metadata_manager import MetadataManager
@@ -78,7 +78,7 @@ class StructureBasedChunkingStrategy(ChunkingStrategy):
             )
             
             # header_docs are split strictly by sections.
-            header_docs = header_splitter.split_text(doc.content)
+            header_docs = header_splitter.split_text(doc.page_content)
 
             # Step 2: Prepare the secondary splitter for sections that are too long
             text_splitter = RecursiveCharacterTextSplitter(

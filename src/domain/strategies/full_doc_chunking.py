@@ -1,6 +1,6 @@
 import re
 from typing import List
-from src.domain.models.document import Document
+from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
 from src.domain.strategies.chunking_strategy import ChunkingStrategy
 from src.domain.services.metadata_manager import MetadataManager
@@ -29,12 +29,12 @@ class FullDocChunkingStrategy(ChunkingStrategy):
         
         for doc in documents:
             # Attempt to find a "Title" (H1) to act as the hierarchy context
-            title = self._extract_h1_title(doc.content)
+            title = self._extract_h1_title(doc.page_content)
             hierarchy = [title] if title else []
 
             std_metadata = MetadataManager.normalize_metadata(
                 doc_metadata=doc.metadata,
-                chunk_content=doc.content,
+                chunk_content=doc.page_content,
                 chunk_index=0,
                 total_chunks=1,
                 hierarchy=hierarchy
@@ -42,7 +42,7 @@ class FullDocChunkingStrategy(ChunkingStrategy):
 
             # Create a single chunk containing the entire document content
             chunk = Chunk(
-                content=doc.content,
+                content=doc.page_content,
                 metadata=std_metadata
             )
             all_chunks.append(chunk)

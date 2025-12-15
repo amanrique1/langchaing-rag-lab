@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 from pathlib import Path
 from application.ports.document_loader import DocumentLoader
-from domain.models.document import Document
+from langchain_core.documents import Document 
 from markitdown import MarkItDown
 
 logger = logging.getLogger(__name__)
@@ -60,13 +60,13 @@ class MarkdownDocumentLoader(DocumentLoader):
             # This ensures structure (# headers) is perfectly preserved.
             if file_path.suffix.lower() == ".md":
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
-                return [Document(content=content, metadata=metadata)]
+                return [Document(page_content=content, metadata=metadata)]
 
             # CONVERSION PATH: Convert PDF/Docx to Markdown
             else:
                 result = self.markdown_converter.convert(file_str)
                 if result and result.markdown:
-                    return [Document(content=result.markdown, metadata=metadata)]
+                    return [Document(page_content=result.markdown, metadata=metadata)]
                 return []
         except Exception as e:
             raise Exception(f"Processing failed: {e}")

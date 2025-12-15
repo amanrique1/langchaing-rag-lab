@@ -3,7 +3,7 @@ import re
 import numpy as np
 from typing import List, Any, Optional
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from src.domain.models.document import Document
+from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
 from src.domain.strategies.chunking_strategy import ChunkingStrategy
 from sklearn.metrics.pairwise import cosine_similarity
@@ -145,7 +145,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         all_chunks = []
         for doc in documents:
             # 1. Pre-process Markdown (Fix headers so they act like sentences)
-            clean_content = self._preprocess_markdown(doc.content)
+            clean_content = self._preprocess_markdown(doc.page_content)
 
             # 2. Tokenize into sentences
             sentences = self._split_sentences(clean_content)
@@ -217,7 +217,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
             "page": doc.metadata.get("page", None),
             "chunk_index": 0,
         }
-        all_chunks.append(Chunk(content=doc.content, metadata=metadata))
+        all_chunks.append(Chunk(content=doc.page_content, metadata=metadata))
 
     def _create_and_append_chunk(
         self, 

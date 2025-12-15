@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from domain.models.document import Document
+from langchain_core.documents import Document
 from domain.models.chunk import Chunk
 
 

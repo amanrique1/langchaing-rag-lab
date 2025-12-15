@@ -1,8 +1,7 @@
 import re
 from typing import List
 from langchain_text_splitters import RecursiveCharacterTextSplitter, TokenTextSplitter
-from src.domain.models.document import Document
-from langchain_core.documents import Document as LangchainDocument
+from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
 from src.domain.strategies.chunking_strategy import ChunkingStrategy
 from src.domain.models.enums import LengthBasedChunkingMode
@@ -82,10 +81,8 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
 
         all_chunks = []
         for doc in documents:
-            langchain_document = LangchainDocument(
-                page_content=doc.content, metadata=doc.metadata
-            )
-            doc_chunks = splitter.split_documents([langchain_document])
+            
+            doc_chunks = splitter.split_documents([doc])
 
             total_chunks = len(doc_chunks)
 
