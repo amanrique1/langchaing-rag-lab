@@ -5,6 +5,7 @@ from src.domain.models.chunk import Chunk
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.runnables import Runnable
 from langchain_core.output_parsers import StrOutputParser
+from src.domain.exceptions.security_violation_exception import SecurityViolationError
 
 class GoogleGenAILanguageModel(LanguageModel):
     def __init__(self, guard: InputGuard, model_name: str = "gemini-2.5-flash", temperature: float = 0.0):

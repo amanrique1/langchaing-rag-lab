@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 from src.domain.guardrails.config import GuardrailConfig
 from src.application.ports.guardrail_model import GuardrailModel
+from src.domain.exceptions.security_violation_exception import SecurityViolationError
 
 class InputGuard:
     def __init__(self, guardrail_model: GuardrailModel):
