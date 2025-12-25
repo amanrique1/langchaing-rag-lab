@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.infrastructure.adapters.language_models.google_genai_language_model import (
+from src.infrastructure.adapters.models.google_genai_language_model import (
     GoogleGenAILanguageModel,
 )
 from src.domain.models.chunk import Chunk
 
 
-@patch('src.infrastructure.adapters.language_models.google_genai_language_model.ChatGoogleGenerativeAI')
-@patch('src.infrastructure.adapters.language_models.google_genai_language_model.ChatPromptTemplate')
+@patch('src.infrastructure.adapters.models.google_genai_language_model.ChatGoogleGenerativeAI')
+@patch('src.infrastructure.adapters.models.google_genai_language_model.ChatPromptTemplate')
 def test_get_answer(mock_prompt_template, mock_chat_google):
     """Tests that the get_answer method works correctly without making real API calls."""
     # Mock the chain components to prevent real API initialization
@@ -30,8 +30,8 @@ def test_get_answer(mock_prompt_template, mock_chat_google):
     assert answer == "test answer"
 
 
-@patch('src.infrastructure.adapters.language_models.google_genai_language_model.ChatGoogleGenerativeAI')
-@patch('src.infrastructure.adapters.language_models.google_genai_language_model.ChatPromptTemplate')
+@patch('src.infrastructure.adapters.models.google_genai_language_model.ChatGoogleGenerativeAI')
+@patch('src.infrastructure.adapters.models.google_genai_language_model.ChatPromptTemplate')
 def test_initialization_with_custom_parameters(mock_prompt_template, mock_chat_google):
     """Tests that the model can be initialized with custom parameters without making API calls."""
     # Mock the components to prevent real API calls
@@ -54,6 +54,6 @@ def test_query_template_file_not_found():
         with pytest.raises(FileNotFoundError, match="The file assets/query_template.txt does not exist"):
             # Force re-import to trigger the module-level code
             import importlib
-            from src.infrastructure.adapters.language_models import google_genai_language_model
+            from src.infrastructure.adapters.models import google_genai_language_model
             importlib.reload(google_genai_language_model)
 

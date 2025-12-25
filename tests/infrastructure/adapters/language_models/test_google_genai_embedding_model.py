@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.infrastructure.adapters.language_models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
+from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
 
 
 @pytest.fixture
@@ -11,7 +11,7 @@ def mock_google_embeddings():
     It yields a tuple containing the mock class and the mock instance,
     allowing tests to verify both instantiation and method calls.
     """
-    with patch('src.infrastructure.adapters.language_models.google_genai_embedding_model.GoogleGenerativeAIEmbeddings') as mock_class:
+    with patch('src.infrastructure.adapters.models.google_genai_embedding_model.GoogleGenerativeAIEmbeddings') as mock_class:
         # The instance that the mocked class will return upon instantiation
         mock_instance = MagicMock()
         mock_class.return_value = mock_instance

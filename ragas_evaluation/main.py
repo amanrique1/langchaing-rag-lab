@@ -5,8 +5,8 @@ from src.application.use_cases.storage_use_case import StorageUseCase
 from src.application.use_cases.talk_use_case import TalkUseCase
 from src.application.use_cases.chunking_use_case import ChunkingUseCase
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
-from src.infrastructure.adapters.language_models.google_genai_language_model import GoogleGenAILanguageModel
-from src.infrastructure.adapters.language_models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
+from src.infrastructure.adapters.models.google_genai_language_model import GoogleGenAILanguageModel
+from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
 from src.domain.models.config_classes import ChunkingConfig
 

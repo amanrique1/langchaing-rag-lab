@@ -7,10 +7,12 @@ from src.application.ports.document_loader import DocumentLoader
 from src.application.ports.chunk_store import ChunkStore
 from src.domain.models.enums import StorageType
 from src.domain.models.config_classes import StorageConfig
+from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
+from src.domain.guardrails.input_guard import InputGuard
 
 # Adapters
-from src.infrastructure.adapters.language_models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
-from src.infrastructure.adapters.language_models.google_genai_language_model import GoogleGenAILanguageModel
+from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
+from src.infrastructure.adapters.models.google_genai_language_model import GoogleGenAILanguageModel
 from src.infrastructure.adapters.rerankers.llm_reranker import LLMReranker
 from src.infrastructure.adapters.rerankers.encoder_reranker import EncoderReranker
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
@@ -31,6 +33,7 @@ class DependencyContainer:
     def __init__(self):
         # Tier 1: Singletons
         self._embedding_model: Optional[EmbeddingModel] = None
+        self._input_guard: Optional[InputGuard] = None
         self._language_model: Optional[LanguageModel] = None
         self._llm_reranker: Optional[LLMReranker] = None
         self._encoder_reranker: Optional[EncoderReranker] = None
@@ -53,9 +56,15 @@ class DependencyContainer:
             self._embedding_model = GoogleGenAIEmbeddingModel()
         return self._embedding_model
     
+    def get_input_guard(self) -> InputGuard:
+        if self._input_guard is None:
+            guard_model = LlamaGuard()
+            self._input_guard = InputGuard(guard_model)
+        return self._input_guard
+    
     def get_language_model(self) -> LanguageModel:
         if self._language_model is None:
-            self._language_model = GoogleGenAILanguageModel()
+            self._language_model = GoogleGenAILanguageModel(self.get_input_guard())
         return self._language_model
     
     def get_llm_reranker(self) -> LLMReranker:
