@@ -9,7 +9,6 @@ from src.application.ports.retriever import Retriever
 from src.domain.models.enums import StorageType
 from src.domain.models.config_classes import StorageConfig
 from src.domain.guardrails.input_guard import InputGuard
-from src.domain.services.ensemble_retriever_service import EnsembleRetrieverService
 
 # Adapters
 from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
