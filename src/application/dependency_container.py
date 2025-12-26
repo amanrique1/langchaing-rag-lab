@@ -5,10 +5,11 @@ from src.application.ports.embedding_model import EmbeddingModel
 from src.application.ports.language_model import LanguageModel
 from src.application.ports.document_loader import DocumentLoader
 from src.application.ports.chunk_store import ChunkStore
+from src.application.ports.retriever import Retriever
 from src.domain.models.enums import StorageType
 from src.domain.models.config_classes import StorageConfig
-from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
 from src.domain.guardrails.input_guard import InputGuard
+from src.domain.services.ensemble_retriever_service import EnsembleRetrieverService
 
 # Adapters
 from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
@@ -18,6 +19,9 @@ from src.infrastructure.adapters.rerankers.encoder_reranker import EncoderRerank
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
 from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import FileSystemChunkStore
+from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
+from src.infrastructure.adapters.retrievers.simple_retriever import SimpleRetriever
+from src.infrastructure.adapters.retrievers.ensemble_retriever import EnsembleRetriever
 
 # Use Cases
 from src.application.use_cases.search_use_case import SearchUseCase
@@ -48,6 +52,25 @@ class DependencyContainer:
         self._talk_use_cases: Dict[Tuple[StorageConfig, bool], TalkUseCase] = {}
         self._storage_use_cases: Dict[StorageConfig, StorageUseCase] = {}
         self._chunking_use_case: Optional[ChunkingUseCase] = None
+    
+    # ========== Tier 0: Retriever Strategies (No caching) ==========
+    
+    def get_retriever(self, config: StorageConfig) -> Retriever:
+        """
+        Factory method - creates new retriever each time.
+        This is fine because retrievers are lightweight.
+        """
+        chunk_store = self.get_chunk_store(config)
+        
+        if config.dual_collection:
+            return EnsembleRetriever(
+                chunk_store=chunk_store,
+                rrf_k=60,
+                content_weight=1.0,
+                metadata_weight=1.0
+            )
+        else:
+            return SimpleRetriever(chunk_store=chunk_store)
     
     # ========== Tier 1: Singleton Models ==========
     
@@ -122,23 +145,34 @@ class DependencyContainer:
             )
         return self._storage_use_cases[config]
 
-    def get_search_use_case(self, config: StorageConfig, use_llm_reranking: bool = False) -> SearchUseCase:
+    def get_search_use_case(
+        self, 
+        config: StorageConfig, 
+        use_llm_reranking: bool = False
+    ) -> SearchUseCase:
         cache_key = (config, use_llm_reranking)
+        
         if cache_key not in self._search_use_cases:
-            reranker = self.get_llm_reranker() if use_llm_reranking else self.get_encoder_reranker()
+            retriever = self.get_retriever(config)
+            reranker = (self.get_llm_reranker() if use_llm_reranking 
+                       else self.get_encoder_reranker())
+            
             self._search_use_cases[cache_key] = SearchUseCase(
-                chunk_store=self.get_chunk_store(config),
+                retriever=retriever,
                 reranker=reranker
             )
+            
         return self._search_use_cases[cache_key]
     
     def get_talk_use_case(self, config: StorageConfig, use_llm_reranking: bool = False) -> TalkUseCase:
         cache_key = (config, use_llm_reranking)
+        
         if cache_key not in self._talk_use_cases:
-            reranker = self.get_llm_reranker() if use_llm_reranking else self.get_encoder_reranker()
+            search_uc = self.get_search_use_case(config, use_llm_reranking)
+            
             self._talk_use_cases[cache_key] = TalkUseCase(
                 language_model=self.get_language_model(),
-                chunk_store=self.get_chunk_store(config),
-                reranker=reranker
+                search_use_case=search_uc
             )
+            
         return self._talk_use_cases[cache_key]
