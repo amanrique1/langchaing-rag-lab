@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.domain.strategies.semantic_chunking import SemanticChunkingStrategy
+from src.domain.services.strategies.semantic_chunking import SemanticChunkingStrategy
 from src.domain.models.document import Document
 from src.domain.models.enums import SemanticChunkingThresholdType
 
@@ -25,7 +25,7 @@ def test_chunk():
 def test_default_embedding_model_initialization():
     """Tests that the default embedding model is initialized when none is provided."""
     with patch.dict('os.environ', {'EMBEDDING_MODEL': 'models/embedding-001'}):
-        with patch('src.domain.strategies.semantic_chunking.GoogleGenerativeAIEmbeddings') as mock_embeddings:
+        with patch('src.domain.services.strategies.semantic_chunking.GoogleGenerativeAIEmbeddings') as mock_embeddings:
             strategy = SemanticChunkingStrategy()
             mock_embeddings.assert_called_once_with(model='models/embedding-001')
 

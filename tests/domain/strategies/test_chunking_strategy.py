@@ -1,5 +1,5 @@
 import pytest
-from src.domain.strategies.chunking_strategy import ChunkingStrategy
+from src.application.ports.chunking_strategy import ChunkingStrategy
 from src.domain.models.document import Document
 
 

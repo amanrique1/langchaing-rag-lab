@@ -5,7 +5,7 @@ from typing import List, Any, Optional
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
-from src.domain.strategies.chunking_strategy import ChunkingStrategy
+from src.application.ports.chunking_strategy import ChunkingStrategy
 from sklearn.metrics.pairwise import cosine_similarity
 from src.domain.models.enums import SemanticChunkingThresholdType
 from src.domain.services.metadata_manager import MetadataManager

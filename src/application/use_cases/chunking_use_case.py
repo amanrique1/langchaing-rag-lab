@@ -1,10 +1,10 @@
 from typing import List, Dict, Any
 from application.ports.document_loader import DocumentLoader
-from src.domain.strategies.chunking_strategy import ChunkingStrategy
-from src.domain.strategies.full_doc_chunking import FullDocChunkingStrategy
-from src.domain.strategies.semantic_chunking import SemanticChunkingStrategy
-from src.domain.strategies.length_based_chunking import LengthBasedChunkingStrategy
-from src.domain.strategies.structure_based_chunking import (
+from src.application.ports.chunking_strategy import ChunkingStrategy
+from src.domain.services.strategies.full_doc_chunking import FullDocChunkingStrategy
+from src.domain.services.strategies.semantic_chunking import SemanticChunkingStrategy
+from src.domain.services.strategies.length_based_chunking import LengthBasedChunkingStrategy
+from src.domain.services.strategies.structure_based_chunking import (
     StructureBasedChunkingStrategy,
 )
 from src.domain.models.chunk import Chunk

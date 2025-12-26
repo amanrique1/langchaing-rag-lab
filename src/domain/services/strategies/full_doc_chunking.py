@@ -2,7 +2,7 @@ import re
 from typing import List
 from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
-from src.domain.strategies.chunking_strategy import ChunkingStrategy
+from src.application.ports.chunking_strategy import ChunkingStrategy
 from src.domain.services.metadata_manager import MetadataManager
 
 
