@@ -17,10 +17,11 @@ from src.infrastructure.adapters.document_loaders.markdown_loader import Markdow
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
 from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import FileSystemChunkStore
 from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
+from src.infrastructure.adapters.rerankers.llm_reranker import LLMReranker
+from src.infrastructure.adapters.rerankers.encoder_reranker import EncoderReranker
 
 # Domain Services
 from src.domain.services.retrieval import SimpleRetriever, EnsembleRetriever
-from src.domain.services.reranking import LLMReranker, EncoderReranker
 
 # Use Cases
 from src.application.use_cases.search_use_case import SearchUseCase
