@@ -13,14 +13,14 @@ from src.domain.guardrails.input_guard import InputGuard
 # Adapters
 from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
 from src.infrastructure.adapters.models.google_genai_language_model import GoogleGenAILanguageModel
-from src.infrastructure.adapters.rerankers.llm_reranker import LLMReranker
-from src.infrastructure.adapters.rerankers.encoder_reranker import EncoderReranker
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
 from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import FileSystemChunkStore
 from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
-from src.infrastructure.adapters.retrievers.simple_retriever import SimpleRetriever
-from src.infrastructure.adapters.retrievers.ensemble_retriever import EnsembleRetriever
+
+# Domain Services
+from src.domain.services.retrieval import SimpleRetriever, EnsembleRetriever
+from src.domain.services.reranking import LLMReranker, EncoderReranker
 
 # Use Cases
 from src.application.use_cases.search_use_case import SearchUseCase

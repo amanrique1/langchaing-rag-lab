@@ -104,10 +104,8 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Models**: `Document`, `Chunk`, `SearchResult` (with relevance scores)
     *   **Services**: 
         *   `MetadataManager`: Central authority for normalizing metadata and generating rich context strings
-        *   `EnsembleRetrieverService`: Merges multiple search strategies using RRF (NEW)
-        *   `SearchService`: Handles ensemble retrieval and reranking (NEW)
-        *   `AnswerGenerationService`: Generates answers using search + LLM (NEW)
-        *   `StorageService`: Manages chunk storage operations (NEW)
+        *   **Retrieval Services**: `SimpleRetriever`, `EnsembleRetriever` (implements RRF algorithm)
+        *   **Reranking Services**: `EncoderReranker`, `LLMReranker` (implements ranking algorithms)
     *   **Strategies**: `ChunkingStrategy` implementations (Length-Based, Structure-Based, Semantic)
     
 *   **Application Layer** (`src/application`): Contains use cases and port interfaces.
@@ -115,22 +113,21 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
         *   `ChunkingUseCase`: Orchestrates document chunking
         *   `StorageUseCase`: Orchestrates storage operations
         *   `TalkUseCase`: Orchestrates Q&A with ensemble retrieval and reranking
-        *   `SearchUseCase`: Orchestrates search operations (NEW)
+        *   `SearchUseCase`: Orchestrates search operations
     *   **Ports** (Interfaces):
         *   `DocumentLoader`: Interface for loading documents
         *   `ChunkStore`: Interface for storing and retrieving chunks (with scores)
         *   `LanguageModel`: Interface for LLM interactions
         *   `EmbeddingModel`: Interface for generating text embeddings
         *   `Reranker`: Interface for reranking search results
+        *   `Retriever`: Interface for retrieval strategies
 
 *   **Infrastructure Layer** (`src/infrastructure`): Provides concrete implementations (adapters).
     *   **Document Loaders**: `MarkdownDocumentLoader`
     *   **Chunk Stores**: 
-        *   `ChromaChunkStore`: Unified store managing both content and metadata collections (UPDATED)
+        *   `ChromaChunkStore`: Unified store managing both content and metadata collections
+        *   `FileSystemChunkStore`: Local file system storage
     *   **Language Models**: `GoogleGenAILanguageModel`, `GoogleGenAIEmbeddingModel`
-    *   **Rerankers**: 
-        *   `EncoderReranker`: Default fast reranker using cross-encoders or bi-encoders.
-        *   `LLMReranker`: Optional LLM-based result reordering for higher accuracy.
     *   **CLI**: Command-line interface (`main.py`)
 
 ### Data Flow Overview
