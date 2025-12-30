@@ -8,13 +8,25 @@ class LanguageModel(ABC):
     """Language model interface for generating answers."""
     
     @abstractmethod
-    def get_answer(self, question: str, context_chunks: List[Chunk]) -> str:
+    def get_answer(self, prompt: str) -> str:
         """
-        Generates an answer to a question based on the provided context chunks.
+        Generates an answer based on a pre-validated and formatted prompt.
 
         Args:
-            question (str): The question to be answered.
-            context_chunks (List[Chunk]): A list of context chunks to be used for answering the question.
+            prompt (str): The fully formatted prompt (Grounding instructions + Context + Question).
+
+        Returns:
+            str: The generated answer.
+        """
+        pass
+
+    @abstractmethod
+    async def aget_answer(self, prompt: str) -> str:
+        """
+        Asynchronously generates an answer based on a pre-validated prompt.
+
+        Args:
+            prompt (str): The fully formatted prompt.
 
         Returns:
             str: The generated answer.

@@ -87,7 +87,7 @@ class DependencyContainer:
     
     def get_language_model(self) -> LanguageModel:
         if self._language_model is None:
-            self._language_model = GoogleGenAILanguageModel(self.get_input_guard())
+            self._language_model = GoogleGenAILanguageModel()
         return self._language_model
     
     def get_llm_reranker(self) -> LLMReranker:
@@ -172,7 +172,8 @@ class DependencyContainer:
             
             self._talk_use_cases[cache_key] = TalkUseCase(
                 language_model=self.get_language_model(),
-                search_use_case=search_uc
+                search_use_case=search_uc,
+                input_guard=self.get_input_guard()
             )
             
         return self._talk_use_cases[cache_key]

@@ -1,5 +1,10 @@
+import logging
 from src.application.ports.language_model import LanguageModel
 from src.application.use_cases.search_use_case import SearchUseCase
+from src.domain.guardrails.input_guard import InputGuard
+from src.domain.exceptions.security_violation_exception import SecurityViolationError
+
+logger = logging.getLogger(__name__)
 
 class TalkUseCase:
     """
@@ -12,19 +17,20 @@ class TalkUseCase:
     def __init__(
         self,
         language_model: LanguageModel,
-        search_use_case: SearchUseCase
+        search_use_case: SearchUseCase,
+        input_guard: InputGuard
     ):
         """
         Initialize the Talk Use Case with injected dependencies.
 
         Args:
-            language_model (LanguageModel): The generative model (e.g., Gemini) responsible 
-                                            for synthesizing the answer.
-            search_use_case (SearchUseCase): The retrieval use case responsible for 
-                                             finding, ranking, and extracting relevant chunks.
+            language_model (LanguageModel): The generative model responsible for answering.
+            search_use_case (SearchUseCase): The retrieval use case.
+            input_guard (InputGuard): The security gateway for validation and grounding.
         """
         self.language_model = language_model
         self.search_use_case = search_use_case
+        self.input_guard = input_guard
     
     def execute(
         self,
@@ -56,13 +62,33 @@ class TalkUseCase:
             num_candidates=num_candidates, 
             use_reranking=use_reranking
         )
-
+        
         # 2. Early Exit if no context
         if not chunks:
             return "I could not find any relevant information in the documentation to answer your question."
-        
-        # 3. Generate Answer
-        return self.language_model.get_answer(query, chunks)
+
+        # 3. Security Grounding & Answer Generation
+        try:
+            # Aggregate context
+            context_text = "\n\n".join([chunk.content for chunk in chunks])
+            
+            # Construct Safe Prompt (Performs Regex + LlamaGuard validation)
+            safe_prompt = self.input_guard.build_safe_query(query, context_text)
+            
+            if safe_prompt is None:
+                return "An internal error occurred while preparing the secure prompt."
+
+            return self.language_model.get_answer(safe_prompt)
+
+        except SecurityViolationError as e:
+            logger.warning(f"Security Alert [{e.violation_type}]: {str(e)}")
+            return (
+                "I cannot fulfill this request as it violates our security policies "
+                "regarding safe and appropriate content."
+            )
+        except Exception as e:
+            logger.error(f"Error in TalkUseCase generation: {e}", exc_info=True)
+            return "An unexpected error occurred while generating the answer."
 
     async def aexecute(
         self,
@@ -93,10 +119,29 @@ class TalkUseCase:
             num_candidates=num_candidates, 
             use_reranking=use_reranking
         )
-
+        # 2. Early Exit if no context
         if not chunks:
             return "I could not find any relevant information in the documentation to answer your question."
-        
-        # 2. Generate Answer Asynchronously (Network bound)
-        # Uses the aget_answer method we added to GoogleGenAILanguageModel
-        return await self.language_model.aget_answer(query, chunks)
+
+        # 3. Security Grounding & Answer Generation
+        try:
+            # Aggregate context
+            context_text = "\n\n".join([chunk.content for chunk in chunks])
+            
+            # Construct Safe Prompt (Performs Regex + LlamaGuard validation)
+            safe_prompt = self.input_guard.build_safe_query(query, context_text)
+            
+            if safe_prompt is None:
+                return "An internal error occurred while preparing the secure prompt."
+
+            return await self.language_model.aget_answer(safe_prompt)
+
+        except SecurityViolationError as e:
+            logger.warning(f"Security Alert [{e.violation_type}]: {str(e)}")
+            return (
+                "I cannot fulfill this request as it violates our security policies "
+                "regarding safe and appropriate content."
+            )
+        except Exception as e:
+            logger.error(f"Error in TalkUseCase generation (async): {e}", exc_info=True)
+            return "An unexpected error occurred while generating the answer."
