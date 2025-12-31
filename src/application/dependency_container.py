@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional
 
 # Ports & Domain
 from src.application.ports.embedding_model import EmbeddingModel
@@ -6,7 +6,8 @@ from src.application.ports.language_model import LanguageModel
 from src.application.ports.document_loader import DocumentLoader
 from src.application.ports.chunk_store import ChunkStore
 from src.application.ports.retriever import Retriever
-from src.domain.models.enums import StorageType
+from src.application.ports.query_expander import QueryExpander
+from src.domain.models.enums import StorageType, QueryExpansionStrategy
 from src.domain.models.config_classes import StorageConfig
 from src.domain.guardrails.input_guard import InputGuard
 
@@ -22,12 +23,14 @@ from src.infrastructure.adapters.rerankers.encoder_reranker import EncoderRerank
 
 # Domain Services
 from src.domain.services.retrieval import SimpleRetriever, EnsembleRetriever
+from src.domain.services.retrieval.strategies import HyDEGenerator, StepBackGenerator
 
 # Use Cases
 from src.application.use_cases.search_use_case import SearchUseCase
 from src.application.use_cases.talk_use_case import TalkUseCase
 from src.application.use_cases.storage_use_case import StorageUseCase
 from src.application.use_cases.chunking_use_case import ChunkingUseCase
+
 
 class DependencyContainer:
     """
@@ -42,35 +45,52 @@ class DependencyContainer:
         self._llm_reranker: Optional[LLMReranker] = None
         self._encoder_reranker: Optional[EncoderReranker] = None
         self._document_loader: Optional[DocumentLoader] = None
+
+        # Tier 1.5: Query Generators (Cached by type)
+        self._query_expanders: Dict[str, QueryExpander] = {}
         
         # Tier 2: Cached Stores (Key: StorageConfig)
         self._chunk_stores: Dict[StorageConfig, ChunkStore] = {}
         
         # Tier 3: Cached Use Cases
-        # Keys include StorageConfig + specific params (like use_llm_reranking)
-        self._search_use_cases: Dict[Tuple[StorageConfig, bool], SearchUseCase] = {}
-        self._talk_use_cases: Dict[Tuple[StorageConfig, bool], TalkUseCase] = {}
+        self._search_use_cases: Dict[Tuple[StorageConfig, bool, Optional[str]], SearchUseCase] = {}
+        self._talk_use_cases: Dict[Tuple[StorageConfig, bool, Optional[str]], TalkUseCase] = {}
         self._storage_use_cases: Dict[StorageConfig, StorageUseCase] = {}
         self._chunking_use_case: Optional[ChunkingUseCase] = None
     
-    # ========== Tier 0: Retriever Strategies (No caching) ==========
+    # ========== Tier 0: Retriever Factory ==========
     
-    def get_retriever(self, config: StorageConfig) -> Retriever:
+    def get_retriever(
+        self, 
+        config: StorageConfig, 
+        expansion_strategy: Optional[QueryExpansionStrategy] = None
+    ) -> Retriever:
         """
-        Factory method - creates new retriever each time.
-        This is fine because retrievers are lightweight.
+        Factory method - creates new retriever with optional query expansion.
+        
+        Args:
+            config (StorageConfig): Storage configuration.
+            expansion_strategy (Optional[QueryExpansionStrategy]): 'hyde', 'stepback', or None.
+        
+        Returns:
+            Retriever: Configured retriever instance.
         """
         chunk_store = self.get_chunk_store(config)
+        query_expander = self.get_query_expander(expansion_strategy) if expansion_strategy else None
         
         if config.dual_collection:
             return EnsembleRetriever(
                 chunk_store=chunk_store,
                 rrf_k=60,
                 content_weight=1.0,
-                metadata_weight=1.0
+                metadata_weight=1.0,
+                query_expander=query_expander
             )
         else:
-            return SimpleRetriever(chunk_store=chunk_store)
+            return SimpleRetriever(
+                chunk_store=chunk_store, 
+                query_expander=query_expander
+            )
     
     # ========== Tier 1: Singleton Models ==========
     
@@ -104,6 +124,31 @@ class DependencyContainer:
         if self._document_loader is None:
             self._document_loader = MarkdownDocumentLoader()
         return self._document_loader
+    
+    # ========== Tier 1.5: Query Generators (Cached by type) ==========
+
+    def get_query_expander(self, strategy: QueryExpansionStrategy) -> Optional[QueryExpander]:
+        """
+        Get or create a query generator based on strategy.
+        
+        Args:
+            strategy (QueryExpansionStrategy): 'hyde' or 'stepback'.
+        
+        Returns:
+            Optional[QueryExpander]: The query generator instance.
+        """
+        if not strategy:
+            return None
+            
+        if strategy not in self._query_expanders:
+            if strategy == QueryExpansionStrategy.HYDE:
+                self._query_expanders[strategy] = HyDEGenerator(self.get_language_model())
+            elif strategy == QueryExpansionStrategy.STEPBACK:
+                self._query_expanders[strategy] = StepBackGenerator(self.get_language_model())
+            else:
+                raise ValueError(f"Unknown expansion strategy: {strategy}")
+        
+        return self._query_expanders[strategy]
     
     # ========== Tier 2: Cached Chunk Stores ==========
     
@@ -148,12 +193,24 @@ class DependencyContainer:
     def get_search_use_case(
         self, 
         config: StorageConfig, 
-        use_llm_reranking: bool = False
+        use_llm_reranking: bool = False,
+        expansion_strategy: Optional[str] = None
     ) -> SearchUseCase:
-        cache_key = (config, use_llm_reranking)
+        """
+        Get or create a search use case.
+        
+        Args:
+            config (StorageConfig): Storage configuration.
+            use_llm_reranking (bool): Whether to use LLM reranking.
+            expansion_strategy (Optional[str]): 'hyde', 'stepback', or None.
+        
+        Returns:
+            SearchUseCase: Configured search use case.
+        """
+        cache_key = (config, use_llm_reranking, expansion_strategy)
         
         if cache_key not in self._search_use_cases:
-            retriever = self.get_retriever(config)
+            retriever = self.get_retriever(config, expansion_strategy)
             reranker = (self.get_llm_reranker() if use_llm_reranking 
                        else self.get_encoder_reranker())
             
@@ -164,11 +221,27 @@ class DependencyContainer:
             
         return self._search_use_cases[cache_key]
     
-    def get_talk_use_case(self, config: StorageConfig, use_llm_reranking: bool = False) -> TalkUseCase:
-        cache_key = (config, use_llm_reranking)
+    def get_talk_use_case(
+        self, 
+        config: StorageConfig, 
+        use_llm_reranking: bool = False,
+        expansion_strategy: Optional[str] = None
+    ) -> TalkUseCase:
+        """
+        Get or create a talk use case.
+        
+        Args:
+            config (StorageConfig): Storage configuration.
+            use_llm_reranking (bool): Whether to use LLM reranking.
+            expansion_strategy (Optional[str]): 'hyde', 'stepback', or None.
+        
+        Returns:
+            TalkUseCase: Configured talk use case.
+        """
+        cache_key = (config, use_llm_reranking, expansion_strategy)
         
         if cache_key not in self._talk_use_cases:
-            search_uc = self.get_search_use_case(config, use_llm_reranking)
+            search_uc = self.get_search_use_case(config, use_llm_reranking, expansion_strategy)
             
             self._talk_use_cases[cache_key] = TalkUseCase(
                 language_model=self.get_language_model(),

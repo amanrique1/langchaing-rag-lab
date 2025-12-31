@@ -1,13 +1,14 @@
 from typing import List, Dict, Optional, Any
-from src.application.ports.retriever import Retriever
 from src.application.ports.chunk_store import ChunkStore
+from src.application.ports.query_expander import QueryExpander
 from src.domain.models.search_result import SearchResult
+from src.application.ports.retriever import Retriever
 
 
 class EnsembleRetriever(Retriever):
     """
     Retriever that combines content and metadata search using 
-    Reciprocal Rank Fusion (RRF).
+    Reciprocal Rank Fusion (RRF), with optional Query Expansion.
     """
 
     def __init__(
@@ -15,17 +16,20 @@ class EnsembleRetriever(Retriever):
         chunk_store: ChunkStore,
         rrf_k: int = 60,
         content_weight: float = 1.0,
-        metadata_weight: float = 1.0
+        metadata_weight: float = 1.0,
+        query_expander: Optional[QueryExpander] = None
     ):
         """
-        Initialize the EnsembleRetriever with a chunk store and optional parameters.
+        Initialize the EnsembleRetriever.
         
         Args:
-            chunk_store (ChunkStore): The chunk store to use for retrieval.
-            rrf_k (int): The number of candidates to consider for RRF.
-            content_weight (float): The weight of content in the RRF score.
-            metadata_weight (float): The weight of metadata in the RRF score.
+            chunk_store (ChunkStore): The chunk store to search.
+            rrf_k (int): RRF constant (default: 60).
+            content_weight (float): Weight for content search results.
+            metadata_weight (float): Weight for metadata search results.
+            query_expander (Optional[QueryExpander]): Optional query expansion strategy.
         """
+        super().__init__(query_expander)
         self.chunk_store = chunk_store
         self.rrf_k = rrf_k
         self.content_weight = content_weight
@@ -38,8 +42,12 @@ class EnsembleRetriever(Retriever):
         filter: Optional[Dict[str, Any]] = None
     ) -> List[SearchResult]:
         """
-        Executes ensemble retrieval: Content + Metadata -> RRF -> Hydration.
+        Executes ensemble retrieval with automatic query expansion if generator is available.
         
+        1. Expands query (if generator exists).
+        2. Runs RRF Ensemble for EACH query variation.
+        3. Aggregates and deduplicates results.
+
         Args:
             query (str): The search query.
             top_k (int): The number of results to return.
@@ -48,8 +56,42 @@ class EnsembleRetriever(Retriever):
         Returns:
             List[SearchResult]: List of search results with scores.
         """
-        # 1. Retrieve from both collections
-        # Get more candidates initially since we'll merge and dedupe
+        # Get list of queries (includes expanded if generator exists)
+        queries = self._get_expanded_queries(query)
+        
+        all_results = []
+
+        # Run the ensemble logic for each query variation
+        for q in queries:
+            results = self._execute_single_pass(q, top_k, filter)
+            all_results.extend(results)
+
+        # If we only ran one query, return results directly
+        if len(queries) == 1:
+            return all_results
+
+        # Deduplicate and sort if multiple queries were run
+        return self._deduplicate_results(all_results, top_k)
+
+    def _execute_single_pass(
+        self, 
+        query: str, 
+        top_k: int, 
+        filter: Optional[Dict[str, Any]]
+    ) -> List[SearchResult]:
+        """
+        The core logic: Content + Metadata Search -> RRF -> Hydration.
+        This runs for a single query string.
+
+        Args:
+            query (str): The search query.
+            top_k (int): The number of results to return.
+            filter (Optional[Dict[str, Any]]): Optional metadata filter.
+        
+        Returns:
+            List[SearchResult]: List of search results with scores.
+        """
+        # A. Retrieve from both collections
         num_candidates = top_k * 2
         
         content_results = self.chunk_store.search(
@@ -59,16 +101,16 @@ class EnsembleRetriever(Retriever):
             query, num_candidates, filter, mode="metadata"
         )
 
-        # 2. Merge using RRF
+        # B. Merge using RRF
         merged_results = self._reciprocal_rank_fusion(
             content_results,
             metadata_results
         )
 
-        # 3. Hydrate content for metadata-only hits
+        # C. Hydrate content for metadata-only hits
         self._hydrate_content(merged_results)
 
-        # 4. Sort and limit
+        # D. Sort and limit
         merged_results.sort(key=lambda x: x.score, reverse=True)
         return merged_results[:top_k]
 
@@ -79,7 +121,7 @@ class EnsembleRetriever(Retriever):
     ) -> List[SearchResult]:
         """
         Merges results using RRF algorithm.
-        
+
         Args:
             content_results (List[SearchResult]): List of content search results.
             metadata_results (List[SearchResult]): List of metadata search results.
@@ -120,7 +162,7 @@ class EnsembleRetriever(Retriever):
     def _hydrate_content(self, results: List[SearchResult]) -> None:
         """
         Fetches real content for metadata-only chunks.
-        
+
         Args:
             results (List[SearchResult]): List of search results to hydrate.
         """

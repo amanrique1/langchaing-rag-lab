@@ -14,3 +14,8 @@ class SemanticChunkingThresholdType(str, Enum):
     STANDARD_DEVIATION = "standard_deviation"
     INTERQUARTILE = "interquartile"
     ABSOLUTE = "absolute"
+
+class QueryExpansionStrategy(str, Enum):
+    """Strategy for expanding queries to improve retrieval."""
+    HYDE = "hyde"
+    STEPBACK = "stepback"

@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 from src.domain.models.document import Document
-from src.domain.services.strategies.length_based_chunking import LengthBasedChunkingStrategy
-from src.domain.services.strategies.semantic_chunking import SemanticChunkingStrategy
-from src.domain.services.strategies.structure_based_chunking import (
+from src.domain.services.chunking.strategies.length_based_chunking import LengthBasedChunkingStrategy
+from src.domain.services.chunking.strategies.semantic_chunking import SemanticChunkingStrategy
+from src.domain.services.chunking.strategies.structure_based_chunking import (
     StructureBasedChunkingStrategy,
 )
 from src.domain.models.enums import (

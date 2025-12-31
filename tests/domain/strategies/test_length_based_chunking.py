@@ -5,14 +5,14 @@ import pytest
 from src.domain.models.document import Document
 from src.domain.models.chunk import Chunk
 from src.domain.models.enums import LengthBasedChunkingMode
-from src.domain.services.strategies.length_based_chunking import LengthBasedChunkingStrategy
+from src.domain.services.chunking.strategies.length_based_chunking import LengthBasedChunkingStrategy
 from langchain_core.documents import Document as LangchainDocument
 
 # The full path to the modules AS THEY ARE IMPORTED in the file under test
-CHAR_SPLITTER_PATH = "src.domain.services.strategies.length_based_chunking.CharacterTextSplitter"
-TOKEN_SPLITTER_PATH = "src.domain.services.strategies.length_based_chunking.TokenTextSplitter"
-CHUNK_MODEL_PATH = "src.domain.services.strategies.length_based_chunking.Chunk"
-LANGCHAIN_DOC_PATH = "src.domain.services.strategies.length_based_chunking.LangchainDocument"
+CHAR_SPLITTER_PATH = "src.domain.services.chunking.strategies.length_based_chunking.CharacterTextSplitter"
+TOKEN_SPLITTER_PATH = "src.domain.services.chunking.strategies.length_based_chunking.TokenTextSplitter"
+CHUNK_MODEL_PATH = "src.domain.services.chunking.strategies.length_based_chunking.Chunk"
+LANGCHAIN_DOC_PATH = "src.domain.services.chunking.strategies.length_based_chunking.LangchainDocument"
 
 
 @pytest.fixture

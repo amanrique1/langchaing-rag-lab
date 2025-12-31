@@ -12,7 +12,8 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 *   **Google Gemini Integration**: Uses Google's embedding and language models.
 *   **RAG Evaluation**: Built-in evaluation suite using the Ragas library to measure performance.
 
-### 🚀 Enhanced RAG Architecture (NEW)
+### 🚀 Enhanced RAG Architecture
+*   **Query Expansion Strategies**: Transform queries for better retrieval using HyDE or Step-Back prompting.
 *   **Metadata-Aware Search**: Dual ChromaDB collections for content and metadata with separate embeddings.
 *   **Ensemble Retrieval**: Combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**.
 *   **Dual Reranking Strategies**:
@@ -38,6 +39,7 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 - [Core Concepts](#core-concepts)
 - [Architecture](#architecture)
 - [Enhanced RAG Architecture Deep Dive](#enhanced-rag-architecture-deep-dive)
+- [Query Expansion Strategies](#query-expansion-strategies)
 - [Security & Grounding](#security--grounding)
 - [Installation](#installation)
 - [Environment Setup](#environment-setup)
@@ -110,8 +112,9 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Services**:
         *   `MetadataManager`: Centralized metadata normalization and keyword extraction (YAKE).
         *   **Retrieval**: `EnsembleRetriever` (RRF algorithm), `SimpleRetriever`.
+        *   **Query Expansion**: `HyDEGenerator`, `StepBackGenerator` (Query transformation strategies).
         *   **Strategies**: Implementations for `LengthBasedChunking`, `StructureBasedChunking`, `SemanticChunking`.
-    *   **Enums**: `StorageType`, `LengthBasedChunkingMode`, `SemanticChunkingThresholdType`.
+    *   **Enums**: `StorageType`, `LengthBasedChunkingMode`, `SemanticChunkingThresholdType`, `QueryExpansionStrategy`.
 
 *   **Application Layer** (`src/application`): Orchestrates business logic via Use Cases and defines Port interfaces.
     *   **Use Cases**:
@@ -119,7 +122,7 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
         *   `SearchUseCase`: Orchestrates complex retrieval and reranking for search queries.
         *   `ChunkingUseCase`: Manages document decomposition strategies.
         *   `StorageUseCase`: Coordinates persistence and retrieval operations.
-    *   **Ports (Interfaces)**: `ChunkStore`, `GuardrailModel`, `LanguageModel`, `EmbeddingModel`, `Reranker`, `Retriever`, `DocumentLoader`, `ChunkingStrategy`.
+    *   **Ports (Interfaces)**: `ChunkStore`, `GuardrailModel`, `LanguageModel`, `EmbeddingModel`, `Reranker`, `Retriever`, `QueryExpander`, `DocumentLoader`, `ChunkingStrategy`.
 
 *   **Infrastructure Layer** (`src/infrastructure`): Concrete adapters for external services and technologies.
     *   **Retrieval & Storage**: 
@@ -194,39 +197,46 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
          │
          ▼
 ┌─────────────────────────────────────┐
+│   Query Expansion (Optional)        │
+│   - HyDE: Generate hypothetical doc │
+│   - StepBack: Broader question      │
+└────────┬────────────────────────────┘
+         │ (Original + Expanded Query)
+         ▼
+┌─────────────────────────────────────┐
 │      Search Use Case (Retrieval)    │
 └────────┬────────────────────────────┘
          │
-         ├──────────────────┬─────────────────┐
-         ▼                  ▼                 │
-┌─────────────────┐  ┌──────────────────┐     │
-│  Content Store  │  │  Metadata Store  │     │
-│   (Semantic)    │  │   (Semantic)     │     │
-└────────┬────────┘  └────────┬─────────┘     │
-          │                    │               │
-          └──────────┬─────────┘               │
-                     ▼                         │
-          ┌─────────────────────┐              │
-          │ Reciprocal Rank     │              │
-          │ Fusion (RRF)        │              │
-          │ Score Merging       │              │
-          └──────────┬──────────┘              │
-                     ▼                         │
-          ┌─────────────────────┐              │
-          │   Deduplication     │              │
-          │   (by chunk_id)     │              │
-          └──────────┬──────────┘              │
-                     ▼                         │
-          ┌─────────────────────┐              │
-          │  Top N Candidates   │              │
-          │      (e.g., 20)     │              │
-          └──────────┬──────────┘              │
-                     ▼                         │
-          ┌───────────────────────────────────┐│
-          │         Reranking Selection       ││
-          │  - Encoder-Based (Local MS-Marco) ││
-          │  - LLM-Based (Google Gemini)      ││
-          └──────────┬────────────────────────┘┘
+         ├──────────────────┐
+         ▼                  ▼                  
+ ┌─────────────────┐  ┌──────────────────┐     
+ │  Content Store  │  │  Metadata Store  │     
+ │   (Semantic)    │  │   (Semantic)     │     
+ └────────┬────────┘  └────────┬─────────┘     
+          │                    │               
+          └──────────┬─────────┘               
+                     ▼                         
+          ┌─────────────────────┐              
+          │ Reciprocal Rank     │              
+          │ Fusion (RRF)        │              
+          │ Score Merging       │              
+          └──────────┬──────────┘              
+                     ▼                         
+          ┌─────────────────────┐              
+          │   Deduplication     │              
+          │   (by chunk_id)     │              
+          └──────────┬──────────┘              
+                     ▼                         
+          ┌─────────────────────┐              
+          │  Top N Candidates   │              
+          │      (e.g., 20)     │              
+          └──────────┬──────────┘              
+                     ▼                         
+          ┌───────────────────────────────────┐
+          │         Reranking Selection       │
+          │  - Encoder-Based (Local MS-Marco) │
+          │  - LLM-Based (Google Gemini)      │
+          └──────────┬────────────────────────┘
                      ▼
           ┌─────────────────────┐
           │   Top K Results     │
@@ -251,92 +261,6 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 │  Generated Answer   │
 └─────────────────────┘
 ```
-
-#### Single-Collection Data Flow (Fallback)
-```
-┌─────────────────┐
-│   User Query    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Talk Use Case │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Chunk Store   │ (ChromaChunkStore)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Relevant Chunks │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────────────────┐
-│        Input Guard (Safety)         │
-│  - Layer 1: Regex Fast Rules        │
-│  - Layer 2: LlamaGuard Semantic     │
-│  - Layer 3: Grounding via Template  │
-└────────┬────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────┐
-│        Language Model (Gemini)      │
-│  - Pure Answer Generation           │
-└─────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Generated      │
-│    Answer       │
-└─────────────────┘
-```
-
----
-
-## Security & Grounding
-
-This project implements a multi-layer security approach to ensure that the LLM provides safe, grounded, and accurate answers.
-
-### Multi-Layer Security Workflow
-
-```
-┌───────────────────┐
-│    User Query     │
-└─────────┬─────────┘
-          │
-          ▼
-┌───────────────────────────────────┐
-│   Layer 1: Fast Rules (Regex)     │  <-- Blocks common jailbreaks
-│   Check: GuardrailConfig.PATTERNS │
-└─────────┬─────────────────────────┘
-          │ (Pass)
-          ▼
-┌───────────────────────────────────┐
-│   Layer 2: Semantic (LlamaGuard)  │  <-- AI-powered intent detection
-│   Check: LlamaGuard.validate()    │
-└─────────┬─────────────────────────┘
-          │ (Pass)
-          ▼
-┌───────────────────────────────────┐
-│   Layer 3: Strict Grounding       │  <-- Prompt instructions
-│   Template: assets/query_template │
-└─────────┬─────────────────────────┘
-          │ (Enforce Safe Prompt)
-          ▼
-┌───────────────────────────────────┐
-│     Language Model Execution      │
-└───────────────────────────────────┘
-```
-
-### Prompt Grounding Strategy
-
-The `InputGuard` uses a strict system prompt (`assets/query_template.txt`) that forces the model to stay "grounded" in the provided context. Key rules include:
-- **No Hallucinations**: Do not use outside knowledge.
-- **Strict Evidence**: Only answer if the answer is explicitly in the context.
-- **Safety**: Refuse to answer harmful or out-of-scope questions.
 
 ---
 
@@ -411,22 +335,154 @@ Chunking strategies automatically extract rich metadata:
 
 **Metadata Filtering**: Lists are converted to comma-separated strings for ChromaDB compatibility.
 
-### Configuration Options
+---
 
-The enhanced pipeline is highly configurable:
+## Query Expansion Strategies
 
-| Option | Effect | Default |
-|--------|--------|--------|
-| `--single-collection` | Use only content search (Disable Dual/Ensemble) | False |
-| `--no-rerank` | Skip reranking step | False |
-| `--llm-reranking` | Enable Gemini-based reranking | False |
-| `--candidates N` | Candidates before reranking | 20 |
-| `--top-k K` | Final results for answer | 5 |
+Query expansion transforms the original user query to improve retrieval quality by generating alternative formulations that may match relevant documents more effectively.
 
-**Performance Profiles**:
-- **High Accuracy**: `--llm-reranking --candidates 20 --top-k 5` (Best results, higher latency)
-- **Balanced (Default)**: `--candidates 20 --top-k 5` (Uses local Encoder reranking, fast & free)
-- **Fast**: `--single-collection --no-rerank --top-k 5` (Lowest latency, no ensemble, no reranking)
+### Available Strategies
+
+#### 1. **HyDE (Hypothetical Document Embeddings)**
+
+**How it works**:
+- Generates a hypothetical answer to the user's question
+- Searches using both the original query and the hypothetical answer
+- The hypothesis often contains vocabulary and concepts similar to actual relevant documents
+
+**When to use**:
+- Complex questions requiring detailed answers
+- Technical queries where you want to match against document-style content
+- When documents contain answers rather than questions
+
+**Example**:
+```
+Original: "What is RAG?"
+HyDE Generated: "Retrieval Augmented Generation (RAG) is a technique that combines 
+information retrieval with language model generation. It works by first retrieving 
+relevant documents from a knowledge base, then using those documents as context..."
+```
+
+**CLI Usage**:
+```bash
+poetry run cli talk "What is RAG?" --expand hyde
+```
+
+#### 2. **Step-Back Prompting**
+
+**How it works**:
+- Transforms specific questions into broader, more general questions
+- Retrieves high-level concepts first, then uses them to answer the specific query
+- Helps when the specific question is too narrow to match relevant documents
+
+**When to use**:
+- Very specific questions that might miss broader relevant content
+- Multi-hop reasoning scenarios
+- When you need conceptual understanding before specific details
+
+**Example**:
+```
+Original: "What happens to the pressure of an ideal gas if temperature doubles 
+and volume increases by a factor of 8?"
+Step-Back: "What are the physics principles behind the ideal gas law?"
+```
+
+**CLI Usage**:
+```bash
+poetry run cli search "specific technical question" --expand stepback
+```
+
+### Query Expansion Architecture
+
+```
+┌─────────────────┐
+│  Original Query │
+└────────┬────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│  QueryExpander (Optional)  │
+│  - HyDEGenerator           │
+│  - StepBackGenerator       │
+└────────┬───────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│  Expanded Queries       │
+│  [Original, Expanded]   │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│  Retrieval for Each     │
+│  Query Variation        │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│  Aggregate & Deduplicate│
+│  Results by chunk_id    │
+└─────────────────────────┘
+```
+
+### Performance Considerations
+
+| Strategy | Latency Impact | Cost | Best For |
+|----------|---------------|------|----------|
+| **No Expansion** | None | Free | Simple queries, well-matched vocabulary |
+| **HyDE** | +1 LLM call | Low | Complex questions, technical content |
+| **Step-Back** | +1 LLM call | Low | Specific questions, multi-hop reasoning |
+
+
+**Key Design Principles**:
+- **Single Parameter**: Retrievers accept one `query_expander` object (not multiple strategy flags)
+- **Automatic Activation**: If a query expander is injected, it's used automatically
+- **Type-Safe**: Uses `QueryExpansionStrategy` enum for validation
+- **Cached**: Query expanders are singleton instances per strategy type
+
+---
+
+## Security & Grounding
+
+This project implements a multi-layer security approach to ensure that the LLM provides safe, grounded, and accurate answers.
+
+### Multi-Layer Security Workflow
+
+```
+┌───────────────────┐
+│    User Query     │
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────────────────────┐
+│   Layer 1: Fast Rules (Regex)     │  <-- Blocks common jailbreaks
+│   Check: GuardrailConfig.PATTERNS │
+└─────────┬─────────────────────────┘
+          │ (Pass)
+          ▼
+┌───────────────────────────────────┐
+│   Layer 2: Semantic (LlamaGuard)  │  <-- AI-powered intent detection
+│   Check: LlamaGuard.validate()    │
+└─────────┬─────────────────────────┘
+          │ (Pass)
+          ▼
+┌───────────────────────────────────┐
+│   Layer 3: Strict Grounding       │  <-- Prompt instructions
+│   Template: assets/query_template │
+└─────────┬─────────────────────────┘
+          │ (Enforce Safe Prompt)
+          ▼
+┌───────────────────────────────────┐
+│     Language Model Execution      │
+└───────────────────────────────────┘
+```
+
+### Prompt Grounding Strategy
+
+The `InputGuard` uses a strict system prompt (`assets/query_template.txt`) that forces the model to stay "grounded" in the provided context. Key rules include:
+- **No Hallucinations**: Do not use outside knowledge.
+- **Strict Evidence**: Only answer if the answer is explicitly in the context.
+- **Safety**: Refuse to answer harmful or out-of-scope questions.
 
 ---
 
@@ -506,7 +562,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 2. Click "Create API Key"
 3. Copy the key and add it to your `.env` file
 
-**Note**: The semantic chunking strategy and the `talk` command require a valid Google API key. Other strategies work without it.
+**Note**: The semantic chunking strategy, query expansion, and the `talk` command require a valid Google API key. Other strategies work without it.
 
 ---
 
@@ -534,7 +590,7 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 #### `save` Subcommand
 `poetry run cli save <source> <strategy> [OPTIONS]`
 *   **`source`**: (Required) Path to the folder with markdown files.
-*   **`strategy`**: (Required) Chunking strategy to use (`length_based`, `structure_based`, `semantic`).
+*   **`strategy`**: (Required) Chunking strategy to use (`length_based`, `structure_based`, `semantic`, `full_doc`).
 *   **`--config '...'`**: Optional JSON string with strategy-specific configuration.
 *   **`--clean`**: Optional flag to clean the destination before saving new chunks.
 
@@ -543,8 +599,8 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 *   **`query`**: (Required) The question to ask or the topic to discuss.
 *   **`--top-k <number>`**: Optional number of final chunks to use for answer generation. Default is `5`.
 *   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
-*   **`--ensemble`**: Enable ensemble retrieval (default: True).
-*   **`--no-ensemble`**: Disable ensemble retrieval, use only content search.
+*   **`--expand <strategy>`**: Optional query expansion strategy (`hyde` or `stepback`).
+*   **`--single-collection`**: Disable ensemble retrieval, use only content search.
 *   **`--no-rerank`**: Disable reranking completely (reranking is enabled by default using Encoder).
 *   **`--llm-reranking`**: Use LLM-based reranking instead of the default Encoder-based reranking.
 
@@ -553,8 +609,8 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 *   **`query`**: (Required) The search term or phrase.
 *   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
 *   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
-*   **`--ensemble`**: Enable ensemble retrieval (default: True).
-*   **`--no-ensemble`**: Disable ensemble retrieval, use only content search.
+*   **`--expand <strategy>`**: Optional query expansion strategy (`hyde` or `stepback`).
+*   **`--single-collection`**: Disable ensemble retrieval, use only content search.
 *   **`--no-rerank`**: Disable reranking completely (reranking is enabled by default using Encoder).
 *   **`--llm-reranking`**: Use LLM-based reranking instead of the default Encoder-based reranking.
 
@@ -565,6 +621,26 @@ All subcommands that interact with storage (`save`, `talk`, `search`, `clean`) a
 | :--- | :--- | :--- |
 | `--local-dir <path>` | Use the local file system for storage. Specifies the output directory. | `output_chunks` |
 | `--chroma-collection <name>` | Use ChromaDB for storage. Specifies the collection name. | `default_collection` |
+
+### Configuration Options
+
+The enhanced pipeline is highly configurable:
+
+| Option | Effect | Default |
+|--------|--------|--------|
+| `--expand hyde` | Use HyDE query expansion | None |
+| `--expand stepback` | Use Step-Back query expansion | None |
+| `--single-collection` | Use only content search (Disable Dual/Ensemble) | False |
+| `--no-rerank` | Skip reranking step | False |
+| `--llm-reranking` | Enable Gemini-based reranking | False |
+| `--candidates N` | Candidates before reranking | 20 |
+| `--top-k K` | Final results for answer | 5 |
+
+**Performance Profiles**:
+- **Maximum Accuracy**: `--expand hyde --llm-reranking --candidates 30 --top-k 5` (Best results, highest latency & cost)
+- **High Accuracy**: `--expand stepback --llm-reranking --candidates 20 --top-k 5` (Excellent results, moderate latency)
+- **Balanced (Default)**: `--candidates 20 --top-k 5` (Uses local Encoder reranking, fast & free)
+- **Fast**: `--single-collection --no-rerank --top-k 5` (Lowest latency, no ensemble, no reranking, no expansion)
 
 ---
 
@@ -663,20 +739,21 @@ poetry run cli save data semantic \
 
 #### 2. Search with ChromaDB
 ```bash
-# Full enhancement
+# Full enhancement with HyDE
 poetry run cli search "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
+  --expand hyde \
   --top-k 5 \
   --candidates 20
 
-# Medium enhancement
+# Medium enhancement with Step-Back
 poetry run cli search "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
+  --expand stepback \
   --top-k 3 \
-  --candidates 10 \
-  --no-rerank
+  --candidates 10
 
-# Basic search
+# Basic search (no expansion, no reranking)
 poetry run cli search "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
   --top-k 3 \
@@ -686,27 +763,28 @@ poetry run cli search "What are the Server Error Codes?" \
 
 #### 3. Talk with ChromaDB
 ```bash
-# Standard mode (Local Encoder reranking - FAST & FREE)
+# Maximum accuracy (HyDE + LLM Reranking)
 poetry run cli talk "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
+  --expand hyde \
+  --llm-reranking \
   --top-k 5 \
   --candidates 20
 
-# High accuracy mode (LLM-based Gemini reranking - BEST RESULTS)
+# High accuracy (Step-Back + Encoder Reranking - DEFAULT)
 poetry run cli talk "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
+  --expand stepback \
   --top-k 5 \
-  --candidates 20 \
-  --llm-reranking
+  --candidates 20
 
-# Balanced mode (no reranking)
+# Balanced mode (no expansion, encoder reranking)
 poetry run cli talk "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
   --top-k 3 \
-  --candidates 15 \
-  --no-rerank
+  --candidates 15
 
-# Fast mode (Content search only, no Ensemble, no Rerank)
+# Fast mode (no expansion, no ensemble, no reranking)
 poetry run cli talk "What are the Server Error Codes?" \
   --chroma-collection 'structure_docs' \
   --top-k 3 \
@@ -717,74 +795,6 @@ poetry run cli talk "What are the Server Error Codes?" \
 #### 4. Clean ChromaDB Collection
 ```bash
 poetry run cli clean --chroma-collection 'structure_docs'
-```
-
----
-
-### Comparing Storage Backends
-
-Test the same query with both backends to compare results:
-
-```bash
-# Save to both backends
-poetry run cli save data structure_based \
-  --local-dir 'fs_test' \
-  --config '{"chunk_size": 1000, "chunk_overlap": 200}' \
-  --clean
-
-poetry run cli save data structure_based \
-  --chroma-collection 'chroma_test' \
-  --config '{"chunk_size": 1000, "chunk_overlap": 200}' \
-  --clean
-
-# Search with FileSystem
-poetry run cli search "What are the Server Error Codes?" \
-  --local-dir 'fs_test' \
-  --top-k 3
-
-# Search with ChromaDB
-poetry run cli search "What are the Server Error Codes?" \
-  --chroma-collection 'chroma_test' \
-  --top-k 3
-
-# Talk with FileSystem
-poetry run cli talk "What are the Server Error Codes?" \
-  --local-dir 'fs_test' \
-  --top-k 3
-
-# Talk with ChromaDB
-poetry run cli talk "What are the Server Error Codes?" \
-  --chroma-collection 'chroma_test' \
-  --top-k 3
-```
-
----
-
-### Performance Testing
-
-Test different configurations to find optimal settings:
-
-```bash
-# Test different chunk sizes
-for size in 500 1000 1500 2000; do
-  poetry run cli save data length_based \
-    --local-dir "chunks_${size}" \
-    --config "{\"chunk_size\": ${size}, \"chunk_overlap\": 200, \"mode\": \"character\"}" \
-    --clean
-  
-  poetry run cli search "What are the Server Error Codes?" \
-    --local-dir "chunks_${size}" \
-    --top-k 3
-done
-
-# Test different candidate counts
-for candidates in 10 20 30 40; do
-  echo "Testing with ${candidates} candidates..."
-  poetry run cli talk "What are the Server Error Codes?" \
-    --chroma-collection 'structure_docs' \
-    --candidates ${candidates} \
-    --top-k 5
-done
 ```
 
 ---
@@ -824,21 +834,22 @@ poetry run cli save data semantic \
   --config '{"threshold_mode": "std", "threshold_value": 1.5, "min_sentences": 1, "max_sentences": 8}'
 ```
 
-#### 4. Search with FileSystem Storage
+#### 4. Search with FileSystem Storage and Query Expansion
 ```bash
-# Full enhancement (ensemble + reranking)
+# Full enhancement with HyDE
 poetry run cli search "What are the Server Error Codes?" \
   --local-dir 'output_chunks/length_based/character' \
+  --expand hyde \
   --top-k 5 \
   --candidates 20
 
-# Fast search (no reranking)
+# Step-Back expansion
 poetry run cli search "What are the Server Error Codes?" \
   --local-dir 'output_chunks/length_based/character' \
-  --top-k 3 \
-  --no-rerank
+  --expand stepback \
+  --top-k 3
 
-# Basic search (no ensemble, no reranking)
+# Basic search (no expansion)
 poetry run cli search "What are the Server Error Codes?" \
   --local-dir 'output_chunks/length_based/character' \
   --top-k 3 \
@@ -848,20 +859,21 @@ poetry run cli search "What are the Server Error Codes?" \
 
 #### 5. Talk with FileSystem Storage
 ```bash
-# Full enhancement
+# Full enhancement with HyDE
 poetry run cli talk "What are the Server Error Codes?" \
   --local-dir 'output_chunks/length_based/character' \
+  --expand hyde \
   --top-k 5 \
   --candidates 20
 
-# Balanced mode (no reranking)
+# Balanced mode with Step-Back
 poetry run cli talk "What are the Server Error Codes?" \
   --local-dir 'output_chunks/length_based/character' \
+  --expand stepback \
   --top-k 3 \
-  --candidates 15 \
-  --no-rerank
+  --candidates 15
 
-# Fast mode
+# Fast mode (no expansion, no ensemble)
 poetry run cli talk "What are the Server Error Codes?" \
   --local-dir 'output_chunks/length_based/character' \
   --top-k 3 \
@@ -889,24 +901,28 @@ poetry run cli save data semantic \
   --local-dir 'demo_chunks' \
   --config '{"threshold_mode": "percentile", "threshold_value": 95.0, "min_sentences": 2}'
 
-# 3. Search for relevant chunks
+# 3. Search with different expansion strategies
 poetry run cli search "What are the Server Error Codes?" \
   --local-dir 'demo_chunks' \
   --top-k 5 \
   --candidates 20
 
-# 4. Ask questions
+# 4. Ask questions with expansion
 poetry run cli talk "What are the Server Error Codes?" \
   --local-dir 'demo_chunks' \
+  --expand hyde \
   --top-k 5 \
   --candidates 20
 
-poetry run cli talk "What are the Server Error Codes?" \
+# 5. Maximum accuracy configuration
+poetry run cli talk "Explain API versioning strategies" \
   --local-dir 'demo_chunks' \
-  --top-k 3 \
-  --no-rerank
+  --expand hyde \
+  --llm-reranking \
+  --top-k 5 \
+  --candidates 30
 
-# 5. Clean up
+# 6. Clean up
 poetry run cli clean --local-dir 'demo_chunks'
 ```
 
@@ -965,3 +981,22 @@ poetry run ruff format .
 # Create .env file
 echo "GOOGLE_API_KEY=your_key_here" > .env
 ```
+
+#### 2. **Query Expansion Takes Too Long**
+
+**Cause**: Query expansion requires an additional LLM call per query.
+
+**Solutions**:
+- Use expansion only for complex queries where it provides value
+- Consider caching expanded queries for frequently asked questions
+- Use faster reranking (default Encoder) instead of LLM reranking
+- Reduce candidate count if using expansion + LLM reranking together
+
+#### 3. **Query Expansion Not Improving Results**
+
+**Analysis**:
+- HyDE works best for questions with detailed answers in documents
+- Step-Back works best for overly specific questions
+- For simple keyword searches, expansion may not help
+
+**Recommendation**: A/B test with and without expansion for your use case.

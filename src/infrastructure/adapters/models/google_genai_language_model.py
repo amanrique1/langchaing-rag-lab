@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Any
+from typing import Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser

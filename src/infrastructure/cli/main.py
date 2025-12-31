@@ -1,10 +1,15 @@
 import json
 import argparse
 import sys
+from typing import Optional
 from dotenv import load_dotenv
 
 from src.application.dependency_container import DependencyContainer
-from src.domain.models.enums import LengthBasedChunkingMode, SemanticChunkingThresholdType
+from src.domain.models.enums import (
+    LengthBasedChunkingMode, 
+    SemanticChunkingThresholdType,
+    QueryExpansionStrategy
+)
 from src.domain.models.config_classes import ChunkingConfig, QueryConfig, StorageConfig
 
 # --- Runner Functions ---
@@ -31,11 +36,19 @@ def run_chunking(chunk_config: ChunkingConfig, container: DependencyContainer, s
     print(f"Successfully processed and saved {len(chunks)} chunks.")
 
 
-def run_talk(talk_config: QueryConfig, container: DependencyContainer, storage_config: StorageConfig, use_llm_reranking: bool):
+def run_talk(
+    talk_config: QueryConfig, 
+    container: DependencyContainer, 
+    storage_config: StorageConfig, 
+    use_llm_reranking: bool,
+    expansion_strategy: Optional[QueryExpansionStrategy] = None
+):
     """Searches for relevant chunks and generates an answer."""
     print(f"Question: {talk_config.query}")
+    if expansion_strategy:
+        print(f"Using {expansion_strategy.value.upper()} query expansion")
     
-    talk_use_case = container.get_talk_use_case(storage_config, use_llm_reranking)
+    talk_use_case = container.get_talk_use_case(storage_config, use_llm_reranking, expansion_strategy)
     answer = talk_use_case.execute(
         talk_config.query,
         talk_config.top_k,
@@ -45,9 +58,18 @@ def run_talk(talk_config: QueryConfig, container: DependencyContainer, storage_c
     print(f"\nAnswer: {answer}")
 
 
-def run_search(search_config: QueryConfig, container: DependencyContainer, storage_config: StorageConfig, use_llm_reranking: bool):
+def run_search(
+    search_config: QueryConfig, 
+    container: DependencyContainer, 
+    storage_config: StorageConfig, 
+    use_llm_reranking: bool,
+    expansion_strategy: Optional[QueryExpansionStrategy] = None
+):
     """Performs a search for relevant chunks."""
-    search_use_case = container.get_search_use_case(storage_config, use_llm_reranking)
+    if expansion_strategy:
+        print(f"Using {expansion_strategy.value.upper()} query expansion")
+        
+    search_use_case = container.get_search_use_case(storage_config, use_llm_reranking, expansion_strategy)
     chunks = search_use_case.execute(
         query=search_config.query,
         top_k=search_config.top_k,
@@ -92,6 +114,15 @@ def _add_ranking_args(parser: argparse.ArgumentParser):
     parser.add_argument("--no-rerank", dest="rerank", action="store_false", default=True, help="Disable reranking.")
     parser.add_argument("--llm-reranking", action="store_true", default=False, help="Use LLM reranking.")
 
+def _add_expansion_args(parser: argparse.ArgumentParser):
+    """Helper to add query expansion arguments."""
+    parser.add_argument(
+        "--expand", 
+        choices=[s.value for s in QueryExpansionStrategy], 
+        default=None,
+        help="Enable query expansion strategy."
+    )
+
 def setup_arg_parser():
     parser = argparse.ArgumentParser(description="Chunk documents and interact with them.")
     subparsers = parser.add_subparsers(dest="task", required=True, help="Task to perform")
@@ -108,12 +139,14 @@ def setup_arg_parser():
     p_talk = subparsers.add_parser("talk", help="Ask a question.")
     p_talk.add_argument("query", help="Query string.")
     _add_ranking_args(p_talk)
+    _add_expansion_args(p_talk)
     _add_storage_args(p_talk)
 
     # SEARCH
     p_search = subparsers.add_parser("search", help="Search chunks.")
     p_search.add_argument("query", help="Query string.")
     _add_ranking_args(p_search)
+    _add_expansion_args(p_search)
     _add_storage_args(p_search)
 
     # CLEAN
@@ -161,10 +194,15 @@ def main():
                 use_reranking=args.rerank
             )
             
+            # Convert string to enum if provided
+            expansion_strategy = None
+            if hasattr(args, 'expand') and args.expand:
+                expansion_strategy = QueryExpansionStrategy(args.expand)
+            
             if args.task == "search":
-                run_search(query_config, container, storage_config, args.llm_reranking)
+                run_search(query_config, container, storage_config, args.llm_reranking, expansion_strategy)
             else:
-                run_talk(query_config, container, storage_config, args.llm_reranking)
+                run_talk(query_config, container, storage_config, args.llm_reranking, expansion_strategy)
         
         elif args.task == "clean":
             clean_storage(container, storage_config)
