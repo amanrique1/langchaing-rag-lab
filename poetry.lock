@@ -1204,6 +1204,21 @@ files = [
 ]
 
 [[package]]
+name = "deprecation"
+version = "2.1.0"
+description = "A library to handle automated deprecations"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
+    {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
+]
+
+[package.dependencies]
+packaging = "*"
+
+[[package]]
 name = "dill"
 version = "0.4.0"
 description = "serialize all of Python"
@@ -2999,6 +3014,75 @@ websocket-client = ">=0.32.0,<0.40.0 || >0.40.0,<0.41.dev0 || >=0.43.dev0"
 
 [package.extras]
 adal = ["adal (>=1.0.2)"]
+
+[[package]]
+name = "lance-namespace"
+version = "0.4.3"
+description = "Lance Namespace interface and plugin registry"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "lance_namespace-0.4.3-py3-none-any.whl", hash = "sha256:27dfb93181673b9fdf3b48a60e8075de43429946c91d913a889964c6d2d01f00"},
+    {file = "lance_namespace-0.4.3.tar.gz", hash = "sha256:c24fc810d967b59b42894b1b4282a964331807f38172d574d5d61ffef77f5520"},
+]
+
+[package.dependencies]
+lance-namespace-urllib3-client = "0.4.3"
+
+[[package]]
+name = "lance-namespace-urllib3-client"
+version = "0.4.3"
+description = "Lance Namespace Specification"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "lance_namespace_urllib3_client-0.4.3-py3-none-any.whl", hash = "sha256:bc32e80e6cc92b12fa9287632d776dadd488363938d117f815c9c4450e482ad6"},
+    {file = "lance_namespace_urllib3_client-0.4.3.tar.gz", hash = "sha256:4cea0c78692debf5722f953671503178aa7fc0e72a80bea28243a9c093c68944"},
+]
+
+[package.dependencies]
+pydantic = ">=2"
+python-dateutil = ">=2.8.2"
+typing-extensions = ">=4.7.1"
+urllib3 = ">=1.25.3,<3.0.0"
+
+[[package]]
+name = "lancedb"
+version = "0.26.0"
+description = "lancedb"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "lancedb-0.26.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:3a0d435fff1392f056c173f695f71d495c691c555daa9802c056ea23f6a3900e"},
+    {file = "lancedb-0.26.0-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a2206320fd0f33c01e264960afd768987646133cf152c4d3a8b7faf81b3017bf"},
+    {file = "lancedb-0.26.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7ca0322cb4b62d526748f6f29e5b43cce4251c7f693e111897eb1f77e7f1ec2b"},
+    {file = "lancedb-0.26.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:7f2b8d69a647265b8753576b501354333c3edfd47d12ec9f47e665e8574c92fe"},
+    {file = "lancedb-0.26.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:8e5cc334686a389cf2f28d1c239d13a205098ed98f3914226d3966858e58b957"},
+    {file = "lancedb-0.26.0-cp39-abi3-win_amd64.whl", hash = "sha256:2fc9b48a11f526de87388002eb3838329db7279241eefb3166c1c6c3b194a3cf"},
+]
+
+[package.dependencies]
+deprecation = "*"
+lance-namespace = ">=0.3.2"
+numpy = "*"
+overrides = {version = ">=0.7", markers = "python_full_version < \"3.12.0\""}
+packaging = "*"
+pyarrow = ">=16"
+pydantic = ">=1.10"
+tqdm = ">=4.27.0"
+
+[package.extras]
+azure = ["adlfs (>=2024.2.0)"]
+clip = ["open-clip-torch", "pillow", "torch"]
+dev = ["pre-commit", "pyright", "ruff", "typing-extensions (>=4.0.0) ; python_full_version < \"3.11.0\""]
+docs = ["mkdocs", "mkdocs-jupyter", "mkdocs-material", "mkdocstrings-python"]
+embeddings = ["awscli (>=1.29.57)", "boto3 (>=1.28.57)", "botocore (>=1.31.57)", "cohere", "colpali-engine (>=0.3.10)", "google-generativeai", "huggingface-hub", "ibm-watsonx-ai (>=1.1.2) ; python_full_version >= \"3.10.0\"", "instructorembedding", "ollama (>=0.3.0)", "open-clip-torch", "openai (>=1.6.1)", "pillow", "requests (>=2.31.0)", "sentence-transformers", "sentencepiece", "torch"]
+pylance = ["pylance (>=1.0.0b14)"]
+siglip = ["pillow", "sentencepiece", "torch", "transformers (>=4.41.0)"]
+tests = ["aiohttp", "boto3", "datafusion", "duckdb", "pandas (>=1.4)", "polars (>=0.19,<=1.3.0)", "pyarrow-stubs", "pylance (>=1.0.0b14)", "pytest", "pytest-asyncio", "pytest-mock", "pytz", "requests", "tantivy"]
 
 [[package]]
 name = "langchain"
@@ -6185,6 +6269,34 @@ files = [
 windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
+name = "pylance"
+version = "1.0.1"
+description = "python wrapper for Lance columnar format"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "pylance-1.0.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:20e253ffa64d778f72adab16f5ad4df0287b7f979fc6caafe99dd2deafbf9ad5"},
+    {file = "pylance-1.0.1-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0aa05a48e7e1d6ebdb064fc137ea244712a3138069cc5d094cfd1d5d14182999"},
+    {file = "pylance-1.0.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c12be806f0f7aab8d8d318d72d17b645cb168542ad3d78c68129b815ec2dcf2b"},
+    {file = "pylance-1.0.1-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:28280e86f3ea19c5caf7ea94948cfdd33ff5d26b569e75569d8920e925619288"},
+    {file = "pylance-1.0.1-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:3a9021e704eb7315b9eb0840d47ed49df9cd30fb10c53cd6c76b9a634764bbe3"},
+    {file = "pylance-1.0.1-cp39-abi3-win_amd64.whl", hash = "sha256:011effc8740fd26ef11bd740283f0f9d2a2f6a7e63d71c27ac5710beca1813d6"},
+]
+
+[package.dependencies]
+lance-namespace = ">=0.2.1"
+numpy = ">=1.22"
+pyarrow = ">=14"
+
+[package.extras]
+benchmarks = ["pytest-benchmark"]
+dev = ["pyright", "ruff (==0.4.1)"]
+geo = ["geoarrow-rust-core", "geoarrow-rust-io"]
+tests = ["boto3", "datafusion (>=50.1)", "datasets", "duckdb", "ml-dtypes", "pandas", "pillow", "polars[pandas,pyarrow]", "psutil", "pytest", "tensorflow ; sys_platform == \"linux\"", "tqdm"]
+torch = ["torch"]
+
+[[package]]
 name = "pypdf"
 version = "6.1.3"
 description = "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files"
@@ -7695,6 +7807,55 @@ files = [
 widechars = ["wcwidth"]
 
 [[package]]
+name = "tantivy"
+version = "0.25.1"
+description = "Official Python bindings for the Tantivy search engine"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "tantivy-0.25.1-cp310-cp310-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:7aa587a3dc9470584cacf5e3640fee93d12ec5f10109669c1f47c4e90820b958"},
+    {file = "tantivy-0.25.1-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:56d77fe667595693d9fa5f0b4545776d84da9526bab0273b3fc6c7536dc0d8a2"},
+    {file = "tantivy-0.25.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5ba8c347cd48595fcaeabb28a909ebce92cf9c5e5c84ab5ba1136a280a307b5c"},
+    {file = "tantivy-0.25.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aa7c4932e8fde1f09f2d46226060e827e197c2749abdc6129d73a752773adc38"},
+    {file = "tantivy-0.25.1-cp310-cp310-win_amd64.whl", hash = "sha256:afcfc5dbb0bcd5d24531f4471737ae0896f33528426ab0b1dad3e427c19120f6"},
+    {file = "tantivy-0.25.1-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:d363d7b4207d3a5aa7f0d212420df35bed18bdb6bae26a2a8bd57428388b7c29"},
+    {file = "tantivy-0.25.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:8f4389cf1d889a1df7c5a3195806b4b56c37cee10d8a26faaa0dea35a867b5ff"},
+    {file = "tantivy-0.25.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:99864c09fc54652c3c2486cdf13f86cdc8200f4b481569cb291e095ca5d496e5"},
+    {file = "tantivy-0.25.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:05abf37ddbc5063c575548be0d62931629c086bff7a5a1b67cf5a8f5ebf4cd8c"},
+    {file = "tantivy-0.25.1-cp311-cp311-win_amd64.whl", hash = "sha256:f307ee8ad21597b0be23af83008fd66cfd5f958cdfa24ec0aaa08a38e86bbef4"},
+    {file = "tantivy-0.25.1-cp312-cp312-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:90fd919e5f611809f746560ecf36eb9be824dec62e21ae17a27243759edb9aa1"},
+    {file = "tantivy-0.25.1-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:4613c7cf6c23f3a97989819690a0f956d799354957de7a204abcc60083cebe02"},
+    {file = "tantivy-0.25.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c477bd20b4df804d57dfc5033431bef27cde605695ae141b03abbf6ebc069129"},
+    {file = "tantivy-0.25.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f9b1a1ba1113c523c7ff7b10f282d6c4074006f7ef8d71e1d973d51bf7291ddb"},
+    {file = "tantivy-0.25.1-cp312-cp312-win_amd64.whl", hash = "sha256:9de0bafd3bd7ac9f8f82d53e17562e9db11a5af308fe5185c4bd86feaddbe4a6"},
+    {file = "tantivy-0.25.1-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:f51ff7196c6f31719202080ed8372d5e3d51e92c749c032fb8234f012e99744c"},
+    {file = "tantivy-0.25.1-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:550e63321bfcacc003859f2fa29c1e8e56450807b3c9a501c1add27cfb9236d9"},
+    {file = "tantivy-0.25.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fde31cc8d6e122faf7902aeea32bc008a429a6e8904e34d3468126a3ec01b016"},
+    {file = "tantivy-0.25.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b11bd5a518b0be645320b47af8493f6a40c4f3234313e37adcf4534a564d27dd"},
+    {file = "tantivy-0.25.1-cp313-cp313-win_amd64.whl", hash = "sha256:cc7fe88853e06b3251ee4fa42b7a2038727f850c8765bcc8167cfc73585dd24e"},
+    {file = "tantivy-0.25.1-cp313-cp313t-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:dae99e75b7eaa9bf5bd16ab106b416370f08c135aed0e117d62a3201cd1ffe36"},
+    {file = "tantivy-0.25.1-cp313-cp313t-macosx_10_12_x86_64.whl", hash = "sha256:506e9533c5ef4d3df43bad64ffecc0aa97c76e361ea610815dc3a20a9d6b30b3"},
+    {file = "tantivy-0.25.1-cp313-cp313t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5dbd4f8f264dacbcc9dee542832da2173fd53deaaea03f082d95214f8b5ed6bc"},
+    {file = "tantivy-0.25.1-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:824c643ccb640dd9e35e00c5d5054ddf3323f56fe4219d57d428a9eeea13d22c"},
+    {file = "tantivy-0.25.1-cp313-cp313t-win_amd64.whl", hash = "sha256:09c987b840afcebac817836ac08407eff17272d8aa60ce6e291f89c81830221d"},
+    {file = "tantivy-0.25.1-cp314-cp314-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:7f5d29ae85dd0f23df8d15b3e7b341d4f9eb5a446bbb9640df48ac1f6d9e0c6c"},
+    {file = "tantivy-0.25.1-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:f2d2938fb69a74fc1bb36edfaf7f0d1596fa1264db0f377bda2195c58bcb6245"},
+    {file = "tantivy-0.25.1-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4f5ff124c4802558e627091e780b362ca944169736caba5a372eef39a79d0ae0"},
+    {file = "tantivy-0.25.1-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:43b80ef62a340416139c93d19264e5f808da48e04f9305f1092b8ed22be0a5be"},
+    {file = "tantivy-0.25.1-cp314-cp314-win_amd64.whl", hash = "sha256:286b654f40c70c1e6b64b9bc7031ed0bf5c440f5bffeaeeee21a0ee6cc39f0e2"},
+    {file = "tantivy-0.25.1-cp39-cp39-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:6ed0cdb0c46f7ef6138d20717d483ef577e156236cc8eefa4f29af740c7c3cb8"},
+    {file = "tantivy-0.25.1-cp39-cp39-macosx_10_12_x86_64.whl", hash = "sha256:6f1125669db85d672c4bac33a71227b316ae6a7569328db6f7953b47a21492f9"},
+    {file = "tantivy-0.25.1-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cba86cbbc6001d152042cdab9c55812595395a40b28a0d6dd742397b58bb5587"},
+    {file = "tantivy-0.25.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f666e98860762ee08a2ddf6fb1004bfe19163e1b78a41813178f2f98ace51d7b"},
+    {file = "tantivy-0.25.1-cp39-cp39-win_amd64.whl", hash = "sha256:3cb8308ec1ef1cbdfe1aa43ce1b7707a72dae3dfb5661dd94ffafd7a8f6ca235"},
+    {file = "tantivy-0.25.1.tar.gz", hash = "sha256:68a3314699a7d18fcf338b52bae8ce46a97dde1128a3e47e33fa4db7f71f265e"},
+]
+
+[package.extras]
+dev = ["nox"]
+
+[[package]]
 name = "tenacity"
 version = "9.1.2"
 description = "Retry code until it succeeds"
@@ -8104,14 +8265,14 @@ tutorials = ["matplotlib", "pandas", "tabulate"]
 
 [[package]]
 name = "typer"
-version = "0.20.0"
+version = "0.21.0"
 description = "Typer, build great CLIs. Easy to code. Based on Python type hints."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "typer-0.20.0-py3-none-any.whl", hash = "sha256:5b463df6793ec1dca6213a3cf4c0f03bc6e322ac5e16e13ddd622a889489784a"},
-    {file = "typer-0.20.0.tar.gz", hash = "sha256:1aaf6494031793e4876fb0bacfa6a912b551cf43c1e63c800df8b1a866720c37"},
+    {file = "typer-0.21.0-py3-none-any.whl", hash = "sha256:c79c01ca6b30af9fd48284058a7056ba0d3bf5cf10d0ff3d0c5b11b68c258ac6"},
+    {file = "typer-0.21.0.tar.gz", hash = "sha256:c87c0d2b6eee3b49c5c64649ec92425492c14488096dfbc8a0c2799b2f6f9c53"},
 ]
 
 [package.dependencies]
@@ -9248,4 +9409,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.11"
-content-hash = "d9a3f2eac6d41c1128ae2711961e8c6626a6147258260cfb8a4b488f5a839b2a"
+content-hash = "3685e2ea2f6c2af789e5dbed35362226370e2e90fc112318968dd762b27f1433"

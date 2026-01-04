@@ -15,6 +15,7 @@ from src.domain.guardrails.input_guard import InputGuard
 from src.infrastructure.adapters.models.google_genai_embedding_model import GoogleGenAIEmbeddingModel
 from src.infrastructure.adapters.models.google_genai_language_model import GoogleGenAILanguageModel
 from src.infrastructure.adapters.document_loaders.markdown_loader import MarkdownDocumentLoader
+from src.infrastructure.adapters.chunk_stores.lance_chunk_store import LanceChunkStore
 from src.infrastructure.adapters.chunk_stores.chroma_chunk_store import ChromaChunkStore
 from src.infrastructure.adapters.chunk_stores.file_system_chunk_store import FileSystemChunkStore
 from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
@@ -35,6 +36,15 @@ from src.application.use_cases.chunking_use_case import ChunkingUseCase
 class DependencyContainer:
     """
     Dependency Injection Container for managing component lifecycle.
+    
+    Storage Backends:
+    - LanceDB: Default, high-performance hybrid search
+    - ChromaDB: Alternative, use with --chroma flag
+    - FileSystem: Local JSON storage, use with --filesystem flag
+    
+    All stores support:
+    - collection_name: For organizing data
+    - persist_directory: For custom storage locations
     """
     
     def __init__(self):
@@ -129,13 +139,13 @@ class DependencyContainer:
 
     def get_query_expander(self, strategy: QueryExpansionStrategy) -> Optional[QueryExpander]:
         """
-        Get or create a query generator based on strategy.
+        Get or create a query expander based on strategy.
         
         Args:
             strategy (QueryExpansionStrategy): 'hyde' or 'stepback'.
         
         Returns:
-            Optional[QueryExpander]: The query generator instance.
+            Optional[QueryExpander]: The query expander instance.
         """
         if not strategy:
             return None
@@ -153,24 +163,56 @@ class DependencyContainer:
     # ========== Tier 2: Cached Chunk Stores ==========
     
     def get_chunk_store(self, config: StorageConfig) -> ChunkStore:
-        """Get cached chunk store based on StorageConfig."""
-        if config not in self._chunk_stores:
-            if config.storage_type == StorageType.CHROMA:
-                store = ChromaChunkStore(
-                    collection_name=config.output_loc,
-                    embedding_model=self.get_embedding_model(),
-                    dual_collection=config.dual_collection
-                )
-            elif config.storage_type == StorageType.FILESYSTEM:
-                store = FileSystemChunkStore(
-                    local_dir=config.output_loc,
-                    embedding_model=self.get_embedding_model(),
-                    dual_collection=config.dual_collection
-                )
-            else:
-                raise ValueError(f"Unknown storage type: {config.storage_type}")
+        """
+        Get cached chunk store based on StorageConfig.
+        
+        All stores support:
+        - collection_name: For organizing/naming the data
+        - persist_directory: For custom storage locations (None = use store default)
+        - dual_collection: For ensemble retrieval strategies
+        
+        Args:
+            config (StorageConfig): The storage configuration.
             
-            self._chunk_stores[config] = store
+        Returns:
+            ChunkStore: The initialized chunk store.
+            
+        Raises:
+            ValueError: If storage type is unknown or initialization fails.
+        """
+        if config not in self._chunk_stores:
+            storage_type = config.storage_type.value if hasattr(config.storage_type, 'value') else str(config.storage_type)
+            
+            try:
+                if config.storage_type == StorageType.FILESYSTEM:
+                    store = FileSystemChunkStore(
+                        collection_name=config.collection_name,
+                        persist_directory=config.persist_directory,
+                        embedding_model=self.get_embedding_model(),
+                        dual_collection=config.dual_collection
+                    )
+                elif config.storage_type == StorageType.CHROMA:
+                    store = ChromaChunkStore(
+                        collection_name=config.collection_name,
+                        persist_directory=config.persist_directory,
+                        embedding_model=self.get_embedding_model(),
+                        dual_collection=config.dual_collection
+                    )
+                elif config.storage_type == StorageType.LANCE:
+                    store = LanceChunkStore(
+                        collection_name=config.collection_name,
+                        persist_directory=config.persist_directory,
+                        embedding_model=self.get_embedding_model()
+                    )
+                else:
+                    raise ValueError(f"Unknown storage type: {config.storage_type}")
+                
+                self._chunk_stores[config] = store
+                
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to create chunk store for {storage_type}: {str(e)}"
+                ) from e
         
         return self._chunk_stores[config]
     

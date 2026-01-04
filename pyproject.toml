@@ -13,7 +13,7 @@ packages = [
 ]
 
 [tool.poetry.scripts]
-cli = "src.infrastructure.cli.main:main"
+cli = "src.infrastructure.cli.main:app"
 ragas = "ragas_evaluation.main:run"
 
 [tool.poetry.dependencies]
@@ -36,6 +36,10 @@ sentence-transformers = "^3.0.0"
 nltk = "^3.9.2"
 yake = "^0.6.0"
 langchain-ollama = "^1.0.1"
+typer = "^0.21.0"
+lancedb = "^0.26.0"
+tantivy = "^0.25.1"
+pylance = "^1.0.1"
 
 
 [tool.poetry.group.lab.dependencies]

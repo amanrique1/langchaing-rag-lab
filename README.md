@@ -5,20 +5,24 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 ## Features
 
 ### Core Features
-*   **Multiple Chunking Strategies**: Supports Length-Based, Structure-Based, and Semantic Chunking.
+*   **Multiple Chunking Strategies**: Supports Length-Based, Structure-Based, Semantic, and Full Document Chunking.
 *   **Hexagonal Architecture**: Clean separation of concerns for robust and testable code.
-*   **Pluggable Chunk Stores**: Stores processed chunks in either the local file system or ChromaDB.
-*   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `talk`, `search`, `clean`).
+*   **Pluggable Storage Backends**: 
+    *   **LanceDB** (Default): High-performance hybrid search with vector + BM25
+    *   **ChromaDB**: Alternative vector store with dual collection support
+    *   **FileSystem**: Local JSON storage for development/testing
+    *   **All stores support**: `collection_name` and `persist_directory` for flexible configuration
+*   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `talk`, `search`, `clean`, `info`).
 *   **Google Gemini Integration**: Uses Google's embedding and language models.
 *   **RAG Evaluation**: Built-in evaluation suite using the Ragas library to measure performance.
 
 ### 🚀 Enhanced RAG Architecture
 *   **Query Expansion Strategies**: Transform queries for better retrieval using HyDE or Step-Back prompting.
-*   **Metadata-Aware Search**: Dual ChromaDB collections for content and metadata with separate embeddings.
+*   **Metadata-Aware Search**: Dual collection support for content and metadata with separate embeddings.
 *   **Ensemble Retrieval**: Combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**.
 *   **Dual Reranking Strategies**:
-    *   **Encoder-Based**: Local reranking using `cross-encoder/ms-marco-MiniLM-L-6-v2`.
-    *   **LLM-Based**: Intelligent reordering using Google Gemini (`--llm-reranking`).
+    *   **Encoder-Based** (Default): Local reranking using `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+    *   **LLM-Based** (Optional): Intelligent reordering using Google Gemini (`--llm-rerank`).
 *   **Security Guardrails**: Multi-layer protection using Regex Fast Rules and Semantic Guardrails (LlamaGuard).
 *   **Strict Grounding**: System instructions enforced via prompt templates to prevent hallucinations and jailbreaks.
 *   **Rich Metadata Extraction**: Automatically extracts headers, filenames, and section titles.
@@ -28,7 +32,8 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 *   **Python 3.11+**: The primary programming language.
 *   **Poetry**: For dependency management and project packaging.
 *   **LangChain**: Framework for LLM orchestration.
-*   **ChromaDB**: Vector database for document chunks.
+*   **LanceDB**: Default vector database with hybrid search (vector + BM25).
+*   **ChromaDB**: Alternative vector database for document chunks.
 *   **Google Gemini**: Used for Embeddings and Language Modeling.
 *   **LlamaGuard**: AI-powered semantic guardrail for input validation.
 *   **Sentence Transformers**: Local Cross-Encoders for fast reranking.
@@ -111,9 +116,6 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Models**: `Document`, `Chunk`, `SearchResult` (Core entities with relevance scoring).
     *   **Services**:
         *   `MetadataManager`: Centralized metadata normalization and keyword extraction (YAKE).
-        *   **Retrieval**: `EnsembleRetriever` (RRF algorithm), `SimpleRetriever`.
-        *   **Query Expansion**: `HyDEGenerator`, `StepBackGenerator` (Query transformation strategies).
-        *   **Strategies**: Implementations for `LengthBasedChunking`, `StructureBasedChunking`, `SemanticChunking`.
     *   **Enums**: `StorageType`, `LengthBasedChunkingMode`, `SemanticChunkingThresholdType`, `QueryExpansionStrategy`.
 
 *   **Application Layer** (`src/application`): Orchestrates business logic via Use Cases and defines Port interfaces.
@@ -125,20 +127,67 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Ports (Interfaces)**: `ChunkStore`, `GuardrailModel`, `LanguageModel`, `EmbeddingModel`, `Reranker`, `Retriever`, `QueryExpander`, `DocumentLoader`, `ChunkingStrategy`.
 
 *   **Infrastructure Layer** (`src/infrastructure`): Concrete adapters for external services and technologies.
-    *   **Retrieval & Storage**: 
-      * `ChromaChunkStore` (Vector DB)
-      * `FileSystemChunkStore` (Local)
+    *   **Retrieval Services**:
+        *   `SimpleRetriever`: Basic vector search with optional query expansion
+        *   `EnsembleRetriever`: Advanced RRF-based retrieval combining content + metadata search
+    *   **Storage Backends**: 
+        *   `LanceChunkStore` (Default): High-performance hybrid search (vector + BM25)
+        *   `ChromaChunkStore`: Dual collection vector store
+        *   `FileSystemChunkStore`: Local JSON storage
+        *   **All stores support**: `collection_name` and `persist_directory` parameters
     *   **AI Models**: 
-      * `GoogleGenAILanguageModel` (Gemini)
-      * `GoogleGenAIEmbeddingModel`
-      * `LlamaGuard` (Safety Adapter)
+        *   `GoogleGenAILanguageModel` (Gemini)
+        *   `GoogleGenAIEmbeddingModel`
+        *   `LlamaGuard` (Safety Adapter)
+    *   **Query Expansion**:
+        *   `HyDEGenerator`: Hypothetical document generation
+        *   `StepBackGenerator`: Broader question generation
     *   **Rerankers**: 
-      * `EncoderReranker` (Local MS-Marco)
-      * `LLMReranker` (LLM-based)
+        *   `EncoderReranker` (Local MS-Marco, Default)
+        *   `LLMReranker` (Gemini-based, Optional)
     *   **Data Ingestion**: 
-      * `MarkdownDocumentLoader`: markdown reader, converter, and parser to document objects
+        *   `MarkdownDocumentLoader`: Markdown reader and parser
     *   **CLI**: 
-      * `main.py`: Command-line interface for orchestrating the end-to-end "Chat with Data" pipeline
+        *   `main.py`: Command-line interface
+
+### Storage Backend Architecture
+
+The system resolves storage backends based on a strict priority system defined in the CLI arguments:
+
+```
+┌──────────────────────────────────────────────┐
+│            Storage Backend Priority          │
+├──────────────────────────────────────────────┤
+│  1. --filesystem       → FileSystem          │
+│  2. --chroma           → ChromaDB            │
+│  3. --lance            → LanceDB ⭐          │
+│  4. Default (No flags) → LanceDB ⭐          │
+└──────────────────────────────────────────────┘
+```
+
+**All storage backends support**:
+- `--collection <name>`: Collection/table name for organizing data
+- `--storage-path <path>`: Custom storage directory (None = use store's default)
+
+**Default Locations** (when `--storage-path` is not specified):
+- **LanceDB**: `./lancedb`
+- **ChromaDB**: `./chroma_db`
+- **FileSystem**: `./filesystem_db`
+
+**LanceDB Advantages** (Default):
+- Native hybrid search (vector + BM25)
+- 10-100x faster than ChromaDB for large datasets
+- Built-in full-text search without dual collections
+
+**When to use ChromaDB**:
+- Explicit compatibility requirements
+- Existing ChromaDB infrastructure
+- Dual collection strategy preference
+
+**When to use FileSystem**:
+- Development/testing
+- Small datasets (<1000 chunks)
+- No database dependencies needed
 
 ### Data Flow Overview
 
@@ -182,11 +231,16 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 └────────┬────────┘
          │
          ▼
-┌─────────────────┐
-│  Chunk Store    │ (Adapter Pattern)
-│  - FileSystem   │
-│  - ChromaDB     │
-└─────────────────┘
+┌────────────────────────────────────────────────────┐
+│         Storage Backend (Adapter)                  │
+│  - LanceDB (Default, --lance flag, Hybrid Search)  │
+│  - ChromaDB (--chroma flag)                        │
+│  - FileSystem (--filesystem flag)                  │
+│                                                    │
+│  All support:                                      │
+│  • collection_name (data organization)             │
+│  • persist_directory (custom location)             │
+└────────────────────────────────────────────────────┘
 ```
 
 #### Enhanced Talk Command Data Flow
@@ -203,14 +257,16 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 └────────┬────────────────────────────┘
          │ (Original + Expanded Query)
          ▼
-┌─────────────────────────────────────┐
-│      Search Use Case (Retrieval)    │
-└────────┬────────────────────────────┘
+┌────────────────────────────────────────┐
+│      Retrieval Strategy Selection      │
+│  - Dual Collection: EnsembleRetriever  │
+│  - Single Collection: SimpleRetriever  │
+└────────┬───────────────────────────────┘
          │
          ├──────────────────┐
          ▼                  ▼                  
  ┌─────────────────┐  ┌──────────────────┐     
- │  Content Store  │  │  Metadata Store  │     
+ │  Content Search │  │  Metadata Search │     
  │   (Semantic)    │  │   (Semantic)     │     
  └────────┬────────┘  └────────┬─────────┘     
           │                    │               
@@ -234,8 +290,8 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
                      ▼                         
           ┌───────────────────────────────────┐
           │         Reranking Selection       │
-          │  - Encoder-Based (Local MS-Marco) │
-          │  - LLM-Based (Google Gemini)      │
+          │  - Encoder-Based (Default, Local) │
+          │  - LLM-Based (--llm-rerank)       │
           └──────────┬────────────────────────┘
                      ▼
           ┌─────────────────────┐
@@ -268,27 +324,27 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 
 The enhanced RAG system introduces several advanced components to improve retrieval accuracy and relevance.
 
-### Unified Dual-Collection Strategy
+### Storage Backend Strategy
 
-The **ChromaChunkStore** manages **two separate ChromaDB collections** internally for each document set:
+The system supports three storage backends with automatic selection:
 
-1. **Content Collection** (`{collection_name}_content`): Stores full chunk content with embeddings
-2. **Metadata Collection** (`{collection_name}_metadata`): Stores searchable metadata strings with embeddings
+**1. LanceDB (Default)** ⭐
+- **Native hybrid search**: Vector + BM25 in single collection
+- **Performance**: 10-100x faster for large datasets
+- **Zero-config**: No dual collection management needed
 
-**Metadata String Format**:
-```
-filename: api_development_standards.md | section: RESTful API Design | headers: API Standards > RESTful API Design | type: markdown
-```
+**2. ChromaDB (--chroma flag)**
+- **Dual collection strategy**: Separate content + metadata collections
+- **Explicit opt-in**: Use when ChromaDB compatibility required
 
-This unified approach:
-- Automatically saves to both collections when storing chunks
-- Hides the complexity of managing dual stores
-- Allows searching either collection via `mode` parameter
-- Combines content and metadata signals for better retrieval
+**3. FileSystem (--filesystem flag)**
+- **Local JSON storage**: Simple file-based persistence
+- **No database**: Zero external dependencies
+- **Use case**: Development, testing, small datasets
 
 ### Ensemble Retrieval with RRF
 
-The `EnsembleRetrieverService` combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**:
+The `EnsembleRetriever` combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**:
 
 **Algorithm**:
 ```python
@@ -310,6 +366,16 @@ Where:
 - Reduces impact of outliers from any single retriever
 - No need to normalize scores across different retrieval methods
 
+### Retriever Selection
+
+The system automatically selects the appropriate retriever based on configuration:
+
+| Configuration | Retriever | Behavior |
+|--------------|-----------|----------|
+| Default | `EnsembleRetriever` | Dual collection search (content + metadata) with RRF fusion |
+| `--single-collection` | `SimpleRetriever` | Single vector search (content only) |
+| Query Expansion | Either retriever | Expands query → retrieves for each → deduplicates results |
+
 ### Reranking System
 
 The system supports a multi-stage reranking process to maximize relevance:
@@ -321,7 +387,7 @@ The system supports a multi-stage reranking process to maximize relevance:
 2.  **LLM-Based Reranking (OPTIONAL)**:
     *   Uses Google Gemini to analytically re-order results.
     *   **Pros**: Higher semantic understanding for complex queries.
-    *   **Enable via**: `--llm-reranking` CLI flag.
+    *   **Enable via**: `--llm-rerank` CLI flag.
 
 ### Metadata Extraction
 
@@ -333,7 +399,7 @@ Chunking strategies automatically extract rich metadata:
 | **Structure-Based** | filename, headers (from hierarchy), section_title, doc_type |
 | **Length-Based** | filename, doc_type |
 
-**Metadata Filtering**: Lists are converted to comma-separated strings for ChromaDB compatibility.
+**Metadata Filtering**: Lists are converted to comma-separated strings for database compatibility.
 
 ---
 
@@ -433,7 +499,6 @@ poetry run cli search "specific technical question" --expand stepback
 | **HyDE** | +1 LLM call | Low | Complex questions, technical content |
 | **Step-Back** | +1 LLM call | Low | Specific questions, multi-hop reasoning |
 
-
 **Key Design Principles**:
 - **Single Parameter**: Retrievers accept one `query_expander` object (not multiple strategy flags)
 - **Automatic Activation**: If a query expander is injected, it's used automatically
@@ -483,33 +548,6 @@ The `InputGuard` uses a strict system prompt (`assets/query_template.txt`) that 
 - **No Hallucinations**: Do not use outside knowledge.
 - **Strict Evidence**: Only answer if the answer is explicitly in the context.
 - **Safety**: Refuse to answer harmful or out-of-scope questions.
-
----
-
-## Technical Deep Dive
-
-### Length-Based Chunking
-
-*   **How it works**: It can split by character count or by token count (using a tokenizer). The `chunk_overlap` parameter allows for a certain number of characters or tokens to be repeated at the beginning of the next chunk to maintain some context.
-*   **Pros**: Simple, fast, and predictable. No external dependencies.
-*   **Cons**: Ignores sentence boundaries, logical structure, and semantic meaning. This can lead to chunks that are not coherent.
-
-### Structure-Based Chunking
-
-*   **How it works**: It uses LangChain's `MarkdownHeaderTextSplitter` to split documents based on headers (`#`, `##`, `###`, etc.). Each section under a header is treated as a potential chunk. If a section exceeds `chunk_size`, it's further subdivided using a length-based approach.
-*   **Pros**: Preserves the logical structure of the document, creating chunks that are more coherent and contextually relevant. Respects document hierarchy.
-*   **Cons**: Only effective for documents with a well-defined structure. It will perform poorly on unstructured text.
-
-### Semantic Chunking
-
-*   **How it works**: 
-    1. Text is split into sentences using NLTK's `sent_tokenize`
-    2. Each sentence is converted to an embedding vector using Google Gemini's `models/embedding-001`
-    3. Cosine similarity is calculated between consecutive sentence embeddings
-    4. A threshold is applied to identify "breakpoints" (significant drops in similarity)
-    5. Text is chunked at these breakpoints, indicating topic shifts
-*   **Pros**: Creates the most coherent and contextually relevant chunks, as it is based on the meaning of the text. Best for RAG systems.
-*   **Cons**: Computationally expensive and slower than other methods. Requires API calls to Google's embedding service. The quality depends on the embedding model.
 
 ---
 
@@ -583,7 +621,49 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 | `save` | Chunks and saves documents from a source folder using a specified strategy. |
 | `talk` | Asks a question, retrieves relevant documents, and generates a conversational answer. |
 | `search` | Searches for document chunks most relevant to a query and displays them. |
-| `clean` | Clears all data from a specified storage location (local directory or ChromaDB collection). |
+| `clean` | Clears all data from a specified storage location. |
+| `info` | Displays information about the current storage configuration. |
+
+### Storage Options (All Commands)
+
+All subcommands that interact with storage accept the following options to configure the backend:
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `--collection <name>` | Collection/table name for organizing data | `default_collection` |
+| `--storage-path <path>` | Custom storage directory (omit to use store default) | None |
+| `--lance` | Use LanceDB storage (default if no storage flag specified) | True (implicit) |
+| `--chroma` | Use ChromaDB storage instead of LanceDB | False |
+| `--filesystem` | Use local filesystem JSON storage | False |
+| `--single-collection` | Use single collection mode (disable ensemble retrieval) | False |
+
+**Storage Type Priority** (when multiple flags specified):
+1. `--filesystem` → FileSystem (highest priority)
+2. `--chroma` → ChromaDB
+3. `--lance` or no flags → LanceDB (default)
+
+**Default Storage Locations** (when `--storage-path` not specified):
+- **LanceDB**: `./lancedb`
+- **ChromaDB**: `./chroma_db`
+- **FileSystem**: `./filesystem_db`
+
+**Examples**:
+```bash
+# Default LanceDB with default location
+poetry run cli save ./docs.pdf length_based
+
+# LanceDB with custom location
+poetry run cli save ./docs.pdf length_based --lance --storage-path ./my_custom_db
+
+# ChromaDB with custom collection
+poetry run cli save ./docs.pdf length_based --chroma --collection my_docs
+
+# FileSystem with custom path
+poetry run cli save ./docs.pdf length_based --filesystem --storage-path ./my_chunks
+
+# LanceDB with custom collection and location
+poetry run cli save ./docs.pdf length_based --collection prod_docs --storage-path /data/vectordb
+```
 
 ### Arguments and Options
 
@@ -593,6 +673,8 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 *   **`strategy`**: (Required) Chunking strategy to use (`length_based`, `structure_based`, `semantic`, `full_doc`).
 *   **`--config '...'`**: Optional JSON string with strategy-specific configuration.
 *   **`--clean`**: Optional flag to clean the destination before saving new chunks.
+*   **`--force`**: Skip confirmation prompts.
+*   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
 
 #### `talk` Subcommand
 `poetry run cli talk <query> [OPTIONS]`
@@ -600,9 +682,10 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 *   **`--top-k <number>`**: Optional number of final chunks to use for answer generation. Default is `5`.
 *   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
 *   **`--expand <strategy>`**: Optional query expansion strategy (`hyde` or `stepback`).
-*   **`--single-collection`**: Disable ensemble retrieval, use only content search.
-*   **`--no-rerank`**: Disable reranking completely (reranking is enabled by default using Encoder).
-*   **`--llm-reranking`**: Use LLM-based reranking instead of the default Encoder-based reranking.
+*   **`--no-rerank`**: Disable reranking completely.
+*   **`--llm-rerank`**: Use LLM-based reranking instead of the default Encoder-based reranking.
+*   **`--verbose`**: Enable verbose output for debugging.
+*   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
 
 #### `search` Subcommand
 `poetry run cli search <query> [OPTIONS]`
@@ -610,17 +693,21 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 *   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
 *   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
 *   **`--expand <strategy>`**: Optional query expansion strategy (`hyde` or `stepback`).
-*   **`--single-collection`**: Disable ensemble retrieval, use only content search.
-*   **`--no-rerank`**: Disable reranking completely (reranking is enabled by default using Encoder).
-*   **`--llm-reranking`**: Use LLM-based reranking instead of the default Encoder-based reranking.
+*   **`--no-rerank`**: Disable reranking completely.
+*   **`--llm-rerank`**: Use LLM-based reranking instead of the default Encoder-based reranking.
+*   **`--verbose`**: Enable verbose output for debugging.
+*   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
 
-### Universal Storage Options
-All subcommands that interact with storage (`save`, `talk`, `search`, `clean`) accept one of the following mutually exclusive options to specify the destination:
+#### `clean` Subcommand
+`poetry run cli clean [OPTIONS]`
+*   **`--force`**: Skip confirmation prompt.
+*   **`--verbose`**: Enable verbose output.
+*   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
 
-| Option | Description | Default |
-| :--- | :--- | :--- |
-| `--local-dir <path>` | Use the local file system for storage. Specifies the output directory. | `output_chunks` |
-| `--chroma-collection <name>` | Use ChromaDB for storage. Specifies the collection name. | `default_collection` |
+#### `info` Subcommand
+`poetry run cli info [OPTIONS]`
+*   **`--verbose`**: Enable verbose output.
+*   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
 
 ### Configuration Options
 
@@ -630,17 +717,21 @@ The enhanced pipeline is highly configurable:
 |--------|--------|--------|
 | `--expand hyde` | Use HyDE query expansion | None |
 | `--expand stepback` | Use Step-Back query expansion | None |
-| `--single-collection` | Use only content search (Disable Dual/Ensemble) | False |
+| `--single-collection` | Use only content search (Disable Ensemble) | False |
 | `--no-rerank` | Skip reranking step | False |
-| `--llm-reranking` | Enable Gemini-based reranking | False |
+| `--llm-rerank` | Enable Gemini-based reranking | False |
 | `--candidates N` | Candidates before reranking | 20 |
 | `--top-k K` | Final results for answer | 5 |
+| `--lance` | Use LanceDB instead of ChromaDB | True |
+| `--chroma` | Use ChromaDB instead of LanceDB | False |
+| `--filesystem` | Use FileSystem instead of LanceDB | False |
+| `--storage-path <path>` | Custom storage directory | None (uses default) |
 
 **Performance Profiles**:
-- **Maximum Accuracy**: `--expand hyde --llm-reranking --candidates 30 --top-k 5` (Best results, highest latency & cost)
-- **High Accuracy**: `--expand stepback --llm-reranking --candidates 20 --top-k 5` (Excellent results, moderate latency)
-- **Balanced (Default)**: `--candidates 20 --top-k 5` (Uses local Encoder reranking, fast & free)
-- **Fast**: `--single-collection --no-rerank --top-k 5` (Lowest latency, no ensemble, no reranking, no expansion)
+- **Maximum Accuracy**: `--expand hyde --llm-rerank --candidates 30 --top-k 5` (Best results, highest latency & cost)
+- **High Accuracy**: `--expand stepback --llm-rerank --candidates 20 --top-k 5` (Excellent results, moderate latency)
+- **Balanced (Default)**: `--candidates 20 --top-k 5` (Uses local Encoder reranking + LanceDB hybrid search, fast & free)
+- **Fast**: `--single-collection --no-rerank --top-k 5` (Lowest latency, no ensemble, no reranking)
 
 ---
 
@@ -666,7 +757,7 @@ poetry run ragas
 
 The evaluation script will:
 - Chunk the documents in the `data` directory using the semantic strategy.
-- Store the chunks in a ChromaDB collection named `ragas_evaluation_store`.
+- Store the chunks in LanceDB collection named `ragas_evaluation_store`.
 - Run the full evaluation, a category-based evaluation, and a quick test.
 - Display a summary of the results in the console.
 
@@ -710,220 +801,355 @@ No configuration parameters are required. The entire document content is used as
 
 ## Comprehensive Testing Examples
 
-This section provides complete examples to test all features with both storage backends.
+This section provides complete examples to test all features with different storage backends.
 
-### Testing with ChromaDB Storage
+### Testing with LanceDB (Default) ⭐
 
 #### 1. Save with Different Strategies
 ```bash
-# Full Doc Chunking
-poetry run cli save data full_doc \
-  --chroma-collection 'full_doc_docs' \
-  --clean
+# Full Doc Chunking (default LanceDB, default location)
+poetry run cli save data full_doc --clean
 
-# Length-based
+# Length-based with custom collection and location
 poetry run cli save data length_based \
-  --chroma-collection 'length_docs' \
+  --collection 'length_docs' \
+  --storage-path ./my_vectordb \
   --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}'
 
-# Structure-based
+# Structure-based with custom collection only
 poetry run cli save data structure_based \
-  --chroma-collection 'structure_docs' \
+  --collection 'structure_docs' \
   --config '{"chunk_size": 1500, "chunk_overlap": 100}'
 
-# Semantic
+# Semantic with default settings
 poetry run cli save data semantic \
-  --chroma-collection 'semantic_docs' \
   --config '{"threshold_mode": "percentile", "threshold_value": 90.0}'
 ```
 
-#### 2. Search with ChromaDB
+#### 2. Search with LanceDB (Native Hybrid Search)
 ```bash
-# Full enhancement with HyDE
+# Default: LanceDB with ensemble retrieval + encoder reranking
 poetry run cli search "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
+  --collection 'structure_docs' \
+  --top-k 5
+
+# With custom storage path
+poetry run cli search "What are the Server Error Codes?" \
+  --collection 'structure_docs' \
+  --storage-path ./lancedb \
+  --top-k 5
+
+# With HyDE expansion
+poetry run cli search "What are the Server Error Codes?" \
   --expand hyde \
   --top-k 5 \
   --candidates 20
 
-# Medium enhancement with Step-Back
+# With Step-Back expansion
 poetry run cli search "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
   --expand stepback \
   --top-k 3 \
   --candidates 10
 
-# Basic search (no expansion, no reranking)
+# Fast mode (no expansion, no reranking)
 poetry run cli search "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
   --top-k 3 \
   --single-collection \
   --no-rerank
 ```
 
-#### 3. Talk with ChromaDB
+#### 3. Talk with LanceDB
 ```bash
+# Default: LanceDB + Ensemble + Encoder Reranking (RECOMMENDED)
+poetry run cli talk "What are the Server Error Codes?" \
+  --collection 'structure_docs' \
+  --top-k 5
+
+# With custom storage path
+poetry run cli talk "What are the Server Error Codes?" \
+  --collection 'length_docs' \
+  --storage-path ./my_vectordb \
+  --top-k 5
+
 # Maximum accuracy (HyDE + LLM Reranking)
 poetry run cli talk "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
   --expand hyde \
-  --llm-reranking \
+  --llm-rerank \
   --top-k 5 \
   --candidates 20
 
-# High accuracy (Step-Back + Encoder Reranking - DEFAULT)
+# High accuracy (Step-Back + Encoder Reranking)
 poetry run cli talk "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
   --expand stepback \
   --top-k 5 \
   --candidates 20
 
-# Balanced mode (no expansion, encoder reranking)
+# Fast mode
 poetry run cli talk "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
-  --top-k 3 \
-  --candidates 15
-
-# Fast mode (no expansion, no ensemble, no reranking)
-poetry run cli talk "What are the Server Error Codes?" \
-  --chroma-collection 'structure_docs' \
   --top-k 3 \
   --single-collection \
   --no-rerank
 ```
 
-#### 4. Clean ChromaDB Collection
+#### 4. Manage LanceDB Collections
 ```bash
-poetry run cli clean --chroma-collection 'structure_docs'
+# Info about default collection
+poetry run cli info
+
+# Info about specific collection with custom path
+poetry run cli info --collection 'length_docs' --storage-path ./my_vectordb
+
+# Clean specific collection
+poetry run cli clean --collection 'structure_docs'
+
+# Clean with custom path
+poetry run cli clean --collection 'length_docs' --storage-path ./my_vectordb --force
+```
+
+---
+
+### Testing with ChromaDB (Explicit Opt-in)
+
+#### 1. Save with ChromaDB
+```bash
+# Save to ChromaDB with default location
+poetry run cli save data structure_based \
+  --chroma \
+  --collection 'chroma_docs' \
+  --clean
+
+# Save to ChromaDB with custom location
+poetry run cli save data structure_based \
+  --chroma \
+  --collection 'chroma_docs' \
+  --storage-path ./my_chroma_db \
+  --clean
+```
+
+#### 2. Search with ChromaDB
+```bash
+# ChromaDB with dual collection strategy (default location)
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand hyde \
+  --top-k 5
+
+# ChromaDB with custom location
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --storage-path ./my_chroma_db \
+  --top-k 5
+```
+
+#### 3. Talk with ChromaDB
+```bash
+# ChromaDB with full enhancement (default location)
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand hyde \
+  --llm-rerank \
+  --top-k 5
+
+# ChromaDB with custom location
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --storage-path ./my_chroma_db \
+  --top-k 5
+```
+
+#### 4. Manage ChromaDB Collections
+```bash
+# Info (default location)
+poetry run cli info --chroma --collection 'chroma_docs'
+
+# Info (custom location)
+poetry run cli info --chroma --collection 'chroma_docs' --storage-path ./my_chroma_db
+
+# Clean (default location)
+poetry run cli clean --chroma --collection 'chroma_docs'
+
+# Clean (custom location)
+poetry run cli clean --chroma --collection 'chroma_docs' --storage-path ./my_chroma_db --force
 ```
 
 ---
 
 ### Testing with FileSystem Storage
 
-#### 1. Save with Length-Based Chunking
+#### 1. Save with Different Strategies
 ```bash
-# Character mode
+# Length-based with default location
 poetry run cli save data length_based \
-  --local-dir 'output_chunks/length_based/character' \
+  --filesystem \
   --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}'
 
-# Token mode
-poetry run cli save data length_based \
-  --local-dir 'output_chunks/length_based/token' \
-  --config '{"chunk_size": 500, "chunk_overlap": 100, "mode": "token"}'
-```
-
-#### 2. Save with Structure-Based Chunking
-```bash
+# Structure-based with custom location and collection
 poetry run cli save data structure_based \
-  --local-dir 'output_chunks/structure_based' \
-  --config '{"chunk_size": 1500, "chunk_overlap": 150, "max_header_levels": 4}'
+  --filesystem \
+  --collection 'fs_docs' \
+  --storage-path ./my_filesystem_db \
+  --config '{"chunk_size": 1500, "chunk_overlap": 150}'
+
+# Semantic with default location
+poetry run cli save data semantic \
+  --filesystem \
+  --config '{"threshold_mode": "percentile", "threshold_value": 95.0}'
 ```
 
-#### 3. Save with Semantic Chunking
+#### 2. Search with FileSystem
 ```bash
-# Percentile threshold
-poetry run cli save data semantic \
-  --local-dir 'output_chunks/semantic_based' \
-  --config '{"threshold_mode": "percentile", "threshold_value": 95.0, "min_sentences": 2}'
-
-# Standard deviation threshold
-poetry run cli save data semantic \
-  --local-dir 'output_chunks/semantic_based' \
-  --config '{"threshold_mode": "std", "threshold_value": 1.5, "min_sentences": 1, "max_sentences": 8}'
-```
-
-#### 4. Search with FileSystem Storage and Query Expansion
-```bash
-# Full enhancement with HyDE
+# With HyDE expansion (default location)
 poetry run cli search "What are the Server Error Codes?" \
-  --local-dir 'output_chunks/length_based/character' \
+  --filesystem \
   --expand hyde \
-  --top-k 5 \
-  --candidates 20
+  --top-k 5
 
-# Step-Back expansion
+# Basic search with custom location
 poetry run cli search "What are the Server Error Codes?" \
-  --local-dir 'output_chunks/length_based/character' \
-  --expand stepback \
+  --filesystem \
+  --collection 'fs_docs' \
+  --storage-path ./my_filesystem_db \
   --top-k 3
+```
 
-# Basic search (no expansion)
-poetry run cli search "What are the Server Error Codes?" \
-  --local-dir 'output_chunks/length_based/character' \
+#### 3. Talk with FileSystem
+```bash
+# Fast mode with custom location
+poetry run cli talk "What are the Server Error Codes?" \
+  --filesystem \
+  --collection 'fs_docs' \
+  --storage-path ./my_filesystem_db \
   --top-k 3 \
   --single-collection \
   --no-rerank
-```
 
-#### 5. Talk with FileSystem Storage
-```bash
-# Full enhancement with HyDE
+# Full enhancement (default location)
 poetry run cli talk "What are the Server Error Codes?" \
-  --local-dir 'output_chunks/length_based/character' \
+  --filesystem \
   --expand hyde \
-  --top-k 5 \
-  --candidates 20
+  --top-k 5
 
-# Balanced mode with Step-Back
-poetry run cli talk "What are the Server Error Codes?" \
-  --local-dir 'output_chunks/length_based/character' \
-  --expand stepback \
-  --top-k 3 \
-  --candidates 15
-
-# Fast mode (no expansion, no ensemble)
-poetry run cli talk "What are the Server Error Codes?" \
-  --local-dir 'output_chunks/length_based/character' \
-  --top-k 3 \
-  --single-collection \
-  --no-rerank
 ```
 
-#### 6. Clean FileSystem Storage
+#### 4. Manage FileSystem Storage
 ```bash
-poetry run cli clean --local-dir 'output_chunks/length_based/character'
+# Info (default location)
+poetry run cli info --filesystem
+
+# Info (custom location)
+poetry run cli info --filesystem --collection 'fs_docs' --storage-path ./my_filesystem_db
+
+# Clean (default location)
+poetry run cli clean --filesystem
+
+# Clean (custom location)
+poetry run cli clean --filesystem --collection 'fs_docs' --storage-path ./my_filesystem_db --force
 ```
 
 ---
 
-### Full Workflow Example
+### Full Workflow Example (LanceDB with Custom Paths)
 
-Complete workflow from scratch:
+Complete workflow from scratch using LanceDB with custom storage locations:
 
 ```bash
-# 1. Clean any existing data
-poetry run cli clean --local-dir 'demo_chunks'
+# 1. Clean any existing data (optional)
+poetry run cli clean --storage-path /data/production/vectordb --force
 
-# 2. Save documents with semantic chunking
+# 2. Save documents with semantic chunking to custom location
 poetry run cli save data semantic \
-  --local-dir 'demo_chunks' \
-  --config '{"threshold_mode": "percentile", "threshold_value": 95.0, "min_sentences": 2}'
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
+  --config '{"threshold_mode": "percentile", "threshold_value": 95.0}'
 
-# 3. Search with different expansion strategies
+# 3. Search with default settings (fast & accurate)
 poetry run cli search "What are the Server Error Codes?" \
-  --local-dir 'demo_chunks' \
-  --top-k 5 \
-  --candidates 20
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
+  --top-k 5
 
 # 4. Ask questions with expansion
 poetry run cli talk "What are the Server Error Codes?" \
-  --local-dir 'demo_chunks' \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
   --expand hyde \
-  --top-k 5 \
-  --candidates 20
+  --top-k 5
 
 # 5. Maximum accuracy configuration
 poetry run cli talk "Explain API versioning strategies" \
-  --local-dir 'demo_chunks' \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
   --expand hyde \
-  --llm-reranking \
+  --llm-rerank \
   --top-k 5 \
   --candidates 30
 
-# 6. Clean up
-poetry run cli clean --local-dir 'demo_chunks'
+# 6. View storage info
+poetry run cli info \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb
+
+# 7. Clean up
+poetry run cli clean \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
+  --force
+```
+
+---
+
+### Backend Comparison Example
+
+Test the same query across all three backends with custom locations:
+
+```bash
+# Setup: Save to all backends with custom paths
+poetry run cli save data semantic \
+  --collection 'lance_test' \
+  --storage-path ./test_dbs/lance \
+  --clean
+
+poetry run cli save data semantic \
+  --chroma \
+  --collection 'chroma_test' \
+  --storage-path ./test_dbs/chroma \
+  --clean
+
+poetry run cli save data semantic \
+  --filesystem \
+  --collection 'fs_test' \
+  --storage-path ./test_dbs/filesystem \
+  --clean
+
+# Compare: Same query, different backends
+echo "=== LanceDB ==="
+poetry run cli search "API error handling" \
+  --collection 'lance_test' \
+  --storage-path ./test_dbs/lance \
+  --top-k 3
+
+echo "=== ChromaDB ==="
+poetry run cli search "API error handling" \
+  --chroma \
+  --collection 'chroma_test' \
+  --storage-path ./test_dbs/chroma \
+  --top-k 3
+
+echo "=== FileSystem ==="
+poetry run cli search "API error handling" \
+  --filesystem \
+  --collection 'fs_test' \
+  --storage-path ./test_dbs/filesystem \
+  --top-k 3
+
+# Cleanup
+poetry run cli clean --collection 'lance_test' --storage-path ./test_dbs/lance --force
+poetry run cli clean --chroma --collection 'chroma_test' --storage-path ./test_dbs/chroma --force
+poetry run cli clean --filesystem --collection 'fs_test' --storage-path ./test_dbs/filesystem --force
 ```
 
 ---
@@ -1000,3 +1226,96 @@ echo "GOOGLE_API_KEY=your_key_here" > .env
 - For simple keyword searches, expansion may not help
 
 **Recommendation**: A/B test with and without expansion for your use case.
+
+#### 4. **Which Storage Backend Should I Use?**
+
+**Recommendation by Use Case**:
+- **Production RAG System**: Use **LanceDB** (default) for best performance and native hybrid search
+- **Existing ChromaDB Infrastructure**: Use `--chroma` flag for compatibility
+- **Development/Testing**: Use `--filesystem` for simple file-based storage
+- **Large Document Sets (10k+ chunks)**: Use **LanceDB** for 10-100x faster search
+- **Small Datasets (<1000 chunks)**: Any backend will work fine
+- **Multiple Projects**: Use `--collection` with different names for organization
+- **Custom Locations**: Use `--storage-path` to specify exact directory
+
+#### 5. **LanceDB vs ChromaDB Performance**
+
+**Benchmarks** (approximate, dataset-dependent):
+- **Small datasets (<1000 chunks)**: Similar performance (~100-200ms)
+- **Medium datasets (1k-10k chunks)**: LanceDB 2-5x faster
+- **Large datasets (>10k chunks)**: LanceDB 10-100x faster
+- **Hybrid search**: LanceDB native support, ChromaDB requires dual collections
+
+#### 6. **Managing Multiple Collections**
+
+**Best Practices**:
+```bash
+# Organize by project
+poetry run cli save data semantic --collection 'project_a_docs'
+poetry run cli save data semantic --collection 'project_b_docs'
+
+# Organize by data type
+poetry run cli save data semantic --collection 'technical_docs'
+poetry run cli save data semantic --collection 'business_docs'
+
+# Use custom paths for isolation
+poetry run cli save data semantic \
+  --collection 'prod_docs' \
+  --storage-path /data/production/vectordb
+
+poetry run cli save data semantic \
+  --collection 'dev_docs' \
+  --storage-path /data/development/vectordb
+```
+
+#### 7. **Storage Path Confusion**
+
+**Understanding the behavior**:
+- **Without `--storage-path`**: Uses store's default directory (e.g., `./lancedb`, `./chroma_db`, `./filesystem_db`)
+- **With `--storage-path`**: Uses your specified directory for that store type
+- **Collection name**: Always used for organization within the storage directory
+
+**Example**:
+```bash
+# These use different locations
+poetry run cli save data semantic --collection 'docs'  # → ./lancedb/docs
+poetry run cli save data semantic --collection 'docs' --storage-path ./custom  # → ./custom/docs
+```
+
+---
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Setup
+
+```bash
+# Clone your fork
+git clone <your-fork-url>
+cd langchain-rag-lab
+
+# Install dependencies
+poetry install
+
+# Run tests
+poetry run pytest
+
+# Run linting
+poetry run ruff check .
+
+# Format code
+poetry run ruff format .
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

@@ -1,6 +1,7 @@
 import os
 import shutil
 import hashlib
+import logging
 from typing import List, Dict, Any, Optional
 
 from langchain_chroma import Chroma
@@ -12,7 +13,11 @@ from src.domain.models.chunk import Chunk
 from src.domain.models.search_result import SearchResult
 from src.domain.services.metadata_manager import MetadataManager
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_COLLECTION_NAME = "rag_docs"
+DEFAULT_PERSIST_DIRECTORY = "./chroma_db"
+
 
 class ChromaChunkStore(ChunkStore):
     """
@@ -21,13 +26,16 @@ class ChromaChunkStore(ChunkStore):
     This store implements a 'Dual Collection' strategy:
     1. Content Collection: Vectors derived from the raw text content.
     2. Metadata Collection: Vectors derived from a string representation of metadata.
+    
+    Both search modes return COMPLETE chunks with content populated.
     """
 
     def __init__(
         self,
         collection_name: str = None,
         embedding_model: EmbeddingModel = None,
-        dual_collection: bool = True
+        persist_directory: str = None,
+        **kwargs
     ):
         """
         Initialize the ChromaChunkStore with embedding capabilities.
@@ -35,7 +43,9 @@ class ChromaChunkStore(ChunkStore):
         Args:
             collection_name (str, optional): The base name for the collections. Defaults to 'rag_docs'.
             embedding_model (EmbeddingModel): The model used to generate vectors. Required.
-            dual_collection (bool): If True, creates a secondary collection for metadata search.
+            persist_directory (str, optional): Directory to persist the data. Defaults to './chroma_db'.
+            **kwargs: Additional parameters:
+                - dual_collection (bool): If True, creates secondary collection for metadata. Default True.
 
         Raises:
             ValueError: If embedding_model is not provided.
@@ -44,15 +54,15 @@ class ChromaChunkStore(ChunkStore):
             raise ValueError("An embedding model must be provided to initialize ChromaChunkStore.")
         
         self.collection_name = collection_name or DEFAULT_COLLECTION_NAME
-        
-        self.persist_directory = "./chroma_db"
-
-        self.dual_collection = dual_collection
+        self.persist_directory = persist_directory or DEFAULT_PERSIST_DIRECTORY
+        self.dual_collection = kwargs.get('dual_collection', True)
         self._embeddings = embedding_model
         
         # Lazy loading placeholders
         self._content_vector_store: Optional[Chroma] = None
         self._metadata_vector_store: Optional[Chroma] = None
+        
+        logger.info(f"ChromaChunkStore initialized with collection: {self.collection_name}")
 
     @property
     def content_collection(self) -> Chroma:
@@ -131,7 +141,7 @@ class ChromaChunkStore(ChunkStore):
         """
         return hashlib.md5(content.encode('utf-8')).hexdigest()
 
-    def save(self, chunks: list[Chunk]) -> None:
+    def save(self, chunks: List[Chunk]) -> None:
         """
         Persists a list of chunks into the vector database.
         
@@ -140,7 +150,7 @@ class ChromaChunkStore(ChunkStore):
         2. A metadata document (indexed by metadata text string).
 
         Args:
-            chunks (list[Chunk]): The domain chunks to save.
+            chunks (List[Chunk]): The domain chunks to save.
         """
         content_docs = []
         content_ids = []
@@ -165,7 +175,7 @@ class ChromaChunkStore(ChunkStore):
                 # Convert metadata dict to a searchable string
                 metadata_text = MetadataManager.create_searchable_string(chunk.metadata)
                 
-                # Link back to original chunk_id
+                # Store chunk_id to link back to content
                 shadow_metadata = {
                     "chunk_id": c_id, 
                     "is_metadata_doc": True,
@@ -185,7 +195,9 @@ class ChromaChunkStore(ChunkStore):
         if has_metadata_collection and metadata_docs:
             self.metadata_collection.add_documents(documents=metadata_docs, ids=metadata_ids)
         
-    def delete(self, chunk_id: str, where: dict = None, where_document: dict = None) -> None:
+        logger.info(f"Saved {len(chunks)} chunks to ChromaDB")
+
+    def delete(self, chunk_id: str, where: Optional[Dict[str, Any]] = None, where_document: Optional[Dict[str, Any]] = None) -> None:
         """
         Deletes a chunk and its associated metadata entry from the database.
 
@@ -197,8 +209,9 @@ class ChromaChunkStore(ChunkStore):
         self.content_collection.delete(ids=[chunk_id], where=where, where_document=where_document)
         
         if self.metadata_collection:
-            # Also delete the shadow metadata document
             self.metadata_collection.delete(ids=[f"{chunk_id}_meta"], where=where, where_document=where_document)
+        
+        logger.debug(f"Deleted chunk: {chunk_id}")
 
     def search(
         self,
@@ -206,9 +219,13 @@ class ChromaChunkStore(ChunkStore):
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None,
         mode: str = "content"
-    ) -> list[SearchResult]:
+    ) -> List[SearchResult]:
         """
         Performs a semantic search and returns typed results with normalized scores.
+        
+        IMPORTANT: Both modes return COMPLETE chunks with content populated.
+        - content mode: Searches content collection, returns full chunks
+        - metadata mode: Searches metadata collection, then hydrates with content from content collection
 
         Args:
             query (str): The search string.
@@ -217,10 +234,7 @@ class ChromaChunkStore(ChunkStore):
             mode (str): 'content' to search chunk text, 'metadata' to search metadata text.
 
         Returns:
-            List[SearchResult]: Results with scores normalized to 0.0-1.0 range (Higher is better).
-
-        Raises:
-            ValueError: If mode is invalid or content collection is uninitialized.
+            List[SearchResult]: Results with complete chunks and scores normalized to 0.0-1.0.
         """
         # 1. Select Collection
         if mode == "content":
@@ -233,55 +247,90 @@ class ChromaChunkStore(ChunkStore):
         # 2. Safety Checks
         if collection is None:
             if mode == "metadata":
+                logger.warning("Metadata collection not available, returning empty results")
                 return []
             raise ValueError("Content collection is not initialized.")
 
-        # 3. Raw Search (Usually returns L2 Distance)
-        docs_with_scores = collection.similarity_search_with_score(
-            query=query,
-            k=top_k,
-            filter=filter
-        )
+        # 3. Perform Search
+        try:
+            docs_with_scores = collection.similarity_search_with_score(
+                query=query,
+                k=top_k,
+                filter=filter
+            )
+        except Exception as e:
+            logger.error(f"Search failed in {mode} mode: {e}")
+            return []
 
         results = []
         retrieval_method = f"semantic_{mode}"
         
-        for rank, (doc, raw_score) in enumerate(docs_with_scores, start=1):
-            chunk = Chunk(content=doc.page_content, metadata=doc.metadata)
+        # 4. If metadata search, we need to hydrate with actual content
+        if mode == "metadata":
+            # Extract chunk_ids from metadata search results
+            chunk_ids = []
+            scores_map = {}
+            ranks_map = {}
             
-            # 4. Score Conversion: Distance -> Similarity
-            # Chroma default is L2 distance (0=identical, higher=different).
-            # We convert this to similarity (1=identical, 0=different).
-            similarity_score = 1.0 / (1.0 + raw_score)
+            for rank, (doc, raw_score) in enumerate(docs_with_scores, start=1):
+                chunk_id = doc.metadata.get('chunk_id')
+                if chunk_id:
+                    chunk_ids.append(chunk_id)
+                    scores_map[chunk_id] = raw_score
+                    ranks_map[chunk_id] = rank
             
-            result = SearchResult(
-                chunk=chunk,
-                score=similarity_score,
-                retrieval_method=retrieval_method,
-                rank=rank
-            )
-            results.append(result)
+            # Batch fetch complete chunks from content collection
+            if chunk_ids:
+                complete_chunks = self.get_by_ids(chunk_ids)
+                
+                # Build results with complete chunks
+                for chunk in complete_chunks:
+                    chunk_id = getattr(chunk, 'chunk_id', None)
+                    if chunk_id and chunk_id in scores_map:
+                        raw_score = scores_map[chunk_id]
+                        rank = ranks_map[chunk_id]
+                        similarity_score = 1.0 / (1.0 + raw_score)
+                        
+                        results.append(SearchResult(
+                            chunk=chunk,
+                            score=similarity_score,
+                            retrieval_method=retrieval_method,
+                            rank=rank
+                        ))
+                
+                # Sort by original rank
+                results.sort(key=lambda x: x.rank)
+        else:
+            # Content search - already have complete chunks
+            for rank, (doc, raw_score) in enumerate(docs_with_scores, start=1):
+                chunk = Chunk(content=doc.page_content, metadata=doc.metadata)
+                chunk.chunk_id = doc.metadata.get('chunk_id', self._generate_stable_id(doc.page_content))
+                
+                similarity_score = 1.0 / (1.0 + raw_score)
+                
+                results.append(SearchResult(
+                    chunk=chunk,
+                    score=similarity_score,
+                    retrieval_method=retrieval_method,
+                    rank=rank
+                ))
 
         return results
 
     def get_by_ids(self, chunk_ids: List[str]) -> List[Chunk]:
         """
-        Retrieves specific chunks by their IDs directly from the Content collection.
+        Retrieves complete chunks by their IDs using ChromaDB's optimized .get() method.
         
-        This is crucial for the "Hydration" step where we swap a metadata-only search result
-        for the actual content text.
-
         Args:
             chunk_ids (List[str]): The IDs to fetch.
 
         Returns:
-            List[Chunk]: The fetched chunks. IDs not found are silently ignored.
+            List[Chunk]: Complete chunks with content and metadata.
         """
         if not chunk_ids:
             return []
 
         try:
-            # Chroma's get returns a dict with parallel lists
             result_dict = self.content_collection.get(ids=chunk_ids)
             
             chunks = []
@@ -292,33 +341,39 @@ class ChromaChunkStore(ChunkStore):
                 
                 for i, content in enumerate(documents):
                     meta = metadatas[i] if metadatas[i] is not None else {}
-                    c = Chunk(content=content, metadata=meta)
-                    # Restore the ID
-                    c.chunk_id = ids[i]
-                    chunks.append(c)
+                    chunk = Chunk(content=content, metadata=meta)
+                    chunk.chunk_id = ids[i]
+                    chunks.append(chunk)
+            
+            logger.debug(f"Retrieved {len(chunks)}/{len(chunk_ids)} chunks by ID")
             return chunks
         except Exception as e:
-            # In production, use a proper logger
-            print(f"Error retrieving chunks by ID: {e}")
+            logger.error(f"Error retrieving chunks by ID: {e}")
             return []
 
     def clear(self) -> None:
-        """
-        Irreversibly deletes all data in the vector store and removes local files.
-        """
-        # Delete via API
+        """Irreversibly deletes all data in the vector store and removes local files."""
         if self.collection_name:
             try:
-                if self._content_vector_store: self._content_vector_store.delete_collection()
-            except Exception: pass
+                if self._content_vector_store: 
+                    self._content_vector_store.delete_collection()
+                    logger.info(f"Deleted content collection: {self.collection_name}_content")
+            except Exception as e:
+                logger.warning(f"Failed to delete content collection: {e}")
+            
             try:
-                if self._metadata_vector_store: self._metadata_vector_store.delete_collection()
-            except Exception: pass
+                if self._metadata_vector_store: 
+                    self._metadata_vector_store.delete_collection()
+                    logger.info(f"Deleted metadata collection: {self.collection_name}_metadata")
+            except Exception as e:
+                logger.warning(f"Failed to delete metadata collection: {e}")
         
-        # Cleanup filesystem
         if os.path.exists(self.persist_directory):
-            try: shutil.rmtree(self.persist_directory)
-            except OSError: pass
+            try: 
+                shutil.rmtree(self.persist_directory)
+                logger.info(f"Removed persist directory: {self.persist_directory}")
+            except OSError as e:
+                logger.warning(f"Failed to remove persist directory: {e}")
 
         self._content_vector_store = None
         self._metadata_vector_store = None

@@ -1,14 +1,36 @@
-from typing import List, Dict, Optional, Any
+import logging
+from typing import List, Dict, Any, Optional
+from collections import defaultdict
+
 from src.application.ports.chunk_store import ChunkStore
 from src.application.ports.query_expander import QueryExpander
-from src.domain.models.search_result import SearchResult
 from src.application.ports.retriever import Retriever
+from src.domain.models.search_result import SearchResult
+
+logger = logging.getLogger(__name__)
 
 
 class EnsembleRetriever(Retriever):
     """
-    Retriever that combines content and metadata search using 
-    Reciprocal Rank Fusion (RRF), with optional Query Expansion.
+    Advanced retrieval strategy using Reciprocal Rank Fusion (RRF).
+    
+    This retriever combines results from:
+    1. Content-based semantic search (vector similarity on chunk text)
+    2. Metadata-based semantic search (vector similarity on metadata fields)
+    
+    **Key Optimization:**
+    All ChunkStore implementations now return COMPLETE chunks from search(),
+    eliminating the need for a separate hydration step. This significantly
+    improves performance by reducing database round-trips.
+    
+    RRF Formula:
+        RRF_score(d) = Σ (weight / (k + rank(d)))
+    
+    where:
+    - d = document/chunk
+    - k = RRF constant (typically 60)
+    - rank(d) = position in result list
+    - weight = importance multiplier for each source
     """
 
     def __init__(
@@ -21,12 +43,15 @@ class EnsembleRetriever(Retriever):
     ):
         """
         Initialize the EnsembleRetriever.
-        
+
         Args:
-            chunk_store (ChunkStore): The chunk store to search.
-            rrf_k (int): RRF constant (default: 60).
-            content_weight (float): Weight for content search results.
-            metadata_weight (float): Weight for metadata search results.
+            chunk_store (ChunkStore): The storage backend (ChromaDB, LanceDB, FileSystem).
+            rrf_k (int): The RRF constant. Higher values reduce the impact of rank position.
+                        Typical range: 1-100. Default: 60.
+            content_weight (float): Multiplier for content-based search scores.
+                                   Higher = favor semantic content matches.
+            metadata_weight (float): Multiplier for metadata-based search scores.
+                                    Higher = favor metadata/keyword matches.
             query_expander (Optional[QueryExpander]): Optional query expansion strategy.
         """
         super().__init__(query_expander)
@@ -34,6 +59,11 @@ class EnsembleRetriever(Retriever):
         self.rrf_k = rrf_k
         self.content_weight = content_weight
         self.metadata_weight = metadata_weight
+        
+        logger.info(
+            f"EnsembleRetriever initialized with RRF_k={rrf_k}, "
+            f"content_weight={content_weight}, metadata_weight={metadata_weight}"
+        )
 
     def retrieve(
         self,
@@ -42,36 +72,49 @@ class EnsembleRetriever(Retriever):
         filter: Optional[Dict[str, Any]] = None
     ) -> List[SearchResult]:
         """
-        Executes ensemble retrieval with automatic query expansion if generator is available.
+        Retrieve the top-k most similar chunks using ensemble retrieval.
         
-        1. Expands query (if generator exists).
-        2. Runs RRF Ensemble for EACH query variation.
-        3. Aggregates and deduplicates results.
-
+        This method:
+        1. Optionally expands the query if query_expander is configured
+        2. Executes retrieval for each query (original + expanded)
+        3. Merges all results using deduplication
+        4. Returns top_k results sorted by score
+        
         Args:
             query (str): The search query.
             top_k (int): The number of results to return.
             filter (Optional[Dict[str, Any]]): Optional metadata filter.
         
         Returns:
-            List[SearchResult]: List of search results with scores.
+            List[SearchResult]: List of search results with RRF scores.
         """
-        # Get list of queries (includes expanded if generator exists)
-        queries = self._get_expanded_queries(query)
+        logger.info(f"Starting ensemble retrieval for query: '{query}' (top_k={top_k})")
         
+        # Get expanded queries (includes original if no expander)
+        queries = self._get_expanded_queries(query)
+        logger.debug(f"Processing {len(queries)} queries (original + expanded)")
+        
+        # Collect results from all queries
         all_results = []
-
-        # Run the ensemble logic for each query variation
-        for q in queries:
+        for idx, q in enumerate(queries):
+            logger.debug(f"Executing retrieval pass {idx + 1}/{len(queries)}: '{q}'")
             results = self._execute_single_pass(q, top_k, filter)
             all_results.extend(results)
-
-        # If we only ran one query, return results directly
-        if len(queries) == 1:
-            return all_results
-
-        # Deduplicate and sort if multiple queries were run
-        return self._deduplicate_results(all_results, top_k)
+        
+        # Deduplicate and merge results
+        logger.debug(f"Deduplicating {len(all_results)} total results")
+        final_results = self._deduplicate_results(all_results, top_k)
+        
+        # Re-rank the final results
+        for rank, result in enumerate(final_results, start=1):
+            result.rank = rank
+        
+        logger.info(
+            f"Ensemble retrieval complete: returned {len(final_results)} results "
+            f"from {len(all_results)} candidates"
+        )
+        
+        return final_results
 
     def _execute_single_pass(
         self, 
@@ -80,39 +123,70 @@ class EnsembleRetriever(Retriever):
         filter: Optional[Dict[str, Any]]
     ) -> List[SearchResult]:
         """
-        The core logic: Content + Metadata Search -> RRF -> Hydration.
-        This runs for a single query string.
-
+        Executes a single retrieval pass with RRF fusion.
+        
+        **Optimized Flow:**
+        1. Parallel searches on content and metadata
+        2. Both return COMPLETE chunks (no hydration needed!)
+        3. Merge using RRF with custom weights
+        4. Sort and return top_k results
+        
         Args:
             query (str): The search query.
-            top_k (int): The number of results to return.
-            filter (Optional[Dict[str, Any]]): Optional metadata filter.
-        
+            top_k (int): Number of final results to return.
+            filter (Optional[Dict]): Metadata filters to apply.
+
         Returns:
-            List[SearchResult]: List of search results with scores.
+            List[SearchResult]: The top_k merged results with complete chunks.
         """
-        # A. Retrieve from both collections
+        # Fetch more candidates than needed for better fusion quality
         num_candidates = top_k * 2
         
-        content_results = self.chunk_store.search(
-            query, num_candidates, filter, mode="content"
-        )
-        metadata_results = self.chunk_store.search(
-            query, num_candidates, filter, mode="metadata"
-        )
+        # A. Content-based semantic search
+        logger.debug(f"Executing content search for: '{query}'")
+        try:
+            content_results = self.chunk_store.search(
+                query=query,
+                top_k=num_candidates,
+                filter=filter,
+                mode="content"
+            )
+            logger.debug(f"Content search returned {len(content_results)} results")
+        except Exception as e:
+            logger.error(f"Content search failed: {e}")
+            content_results = []
+        
+        # B. Metadata-based semantic search
+        logger.debug(f"Executing metadata search for: '{query}'")
+        try:
+            metadata_results = self.chunk_store.search(
+                query=query,
+                top_k=num_candidates,
+                filter=filter,
+                mode="metadata"
+            )
+            logger.debug(f"Metadata search returned {len(metadata_results)} results")
+        except Exception as e:
+            logger.error(f"Metadata search failed: {e}")
+            metadata_results = []
 
-        # B. Merge using RRF
+        # C. Merge using Reciprocal Rank Fusion
+        logger.debug("Merging results using RRF")
         merged_results = self._reciprocal_rank_fusion(
             content_results,
             metadata_results
         )
-
-        # C. Hydrate content for metadata-only hits
-        self._hydrate_content(merged_results)
-
-        # D. Sort and limit
+        
+        # D. Sort by fused score (descending) and limit to top_k
         merged_results.sort(key=lambda x: x.score, reverse=True)
-        return merged_results[:top_k]
+        final_results = merged_results[:top_k]
+        
+        logger.debug(
+            f"Single pass complete: {len(final_results)} results "
+            f"(from {len(content_results)} content + {len(metadata_results)} metadata)"
+        )
+        
+        return final_results
 
     def _reciprocal_rank_fusion(
         self,
@@ -120,66 +194,75 @@ class EnsembleRetriever(Retriever):
         metadata_results: List[SearchResult]
     ) -> List[SearchResult]:
         """
-        Merges results using RRF algorithm.
-
-        Args:
-            content_results (List[SearchResult]): List of content search results.
-            metadata_results (List[SearchResult]): List of metadata search results.
+        Merges two result lists using Reciprocal Rank Fusion with custom weights.
         
-        Returns:
-            List[SearchResult]: List of merged search results with scores.
-        """
-        rrf_scores: Dict[str, float] = {}
-        chunk_map: Dict[str, SearchResult] = {}
-
-        def process_list(results: List[SearchResult], weight: float, is_content: bool):
-            for result in results:
-                c_id = (result.chunk.chunk_id if is_content 
-                       else result.chunk.metadata.get('chunk_id', result.chunk.chunk_id))
-                
-                score_contribution = weight / (self.rrf_k + result.rank)
-                rrf_scores[c_id] = rrf_scores.get(c_id, 0.0) + score_contribution
-
-                if c_id not in chunk_map or is_content:
-                    if not is_content:
-                        result.chunk.chunk_id = c_id
-                    chunk_map[c_id] = result
-
-        process_list(content_results, self.content_weight, True)
-        process_list(metadata_results, self.metadata_weight, False)
-
-        return [
-            SearchResult(
-                chunk=chunk_map[c_id].chunk,
-                score=score,
-                retrieval_method="ensemble_rrf",
-                rank=None
-            )
-            for c_id, score in rrf_scores.items()
-            if c_id in chunk_map
-        ]
-
-    def _hydrate_content(self, results: List[SearchResult]) -> None:
-        """
-        Fetches real content for metadata-only chunks.
-
+        **Algorithm:**
+        1. For each result list, assign RRF score: weight / (k + rank)
+        2. Sum scores for chunks that appear in multiple lists
+        3. Keep the chunk object from the content results (preferred) or metadata results
+        
+        **Key Point:** All chunks are already complete - no hydration needed!
+        
         Args:
-            results (List[SearchResult]): List of search results to hydrate.
+            content_results (List[SearchResult]): Results from content search.
+            metadata_results (List[SearchResult]): Results from metadata search.
+
+        Returns:
+            List[SearchResult]: Merged results with RRF scores.
         """
-        ids_to_fetch = []
-        indices_map = {}
-
-        for i, res in enumerate(results):
-            if res.chunk.metadata.get('is_metadata_doc', False):
-                c_id = res.chunk.chunk_id
-                ids_to_fetch.append(c_id)
-                indices_map[c_id] = i
-
-        if not ids_to_fetch:
-            return
-
-        real_chunks = self.chunk_store.get_by_ids(ids_to_fetch)
-        for real_chunk in real_chunks:
-            if real_chunk.chunk_id in indices_map:
-                idx = indices_map[real_chunk.chunk_id]
-                results[idx].chunk = real_chunk
+        rrf_scores: Dict[str, float] = defaultdict(float)
+        chunk_map: Dict[str, SearchResult] = {}
+        retrieval_methods: Dict[str, List[str]] = defaultdict(list)
+        
+        # Process content results
+        for result in content_results:
+            chunk_id = result.chunk.chunk_id
+            if not chunk_id:
+                continue
+            
+            # RRF contribution from content search
+            score_contribution = self.content_weight / (self.rrf_k + result.rank)
+            rrf_scores[chunk_id] += score_contribution
+            retrieval_methods[chunk_id].append(f"content(r={result.rank})")
+            
+            # Store chunk (prefer content source for complete data)
+            if chunk_id not in chunk_map:
+                chunk_map[chunk_id] = result
+        
+        # Process metadata results
+        for result in metadata_results:
+            chunk_id = result.chunk.chunk_id
+            if not chunk_id:
+                continue
+            
+            # RRF contribution from metadata search
+            score_contribution = self.metadata_weight / (self.rrf_k + result.rank)
+            rrf_scores[chunk_id] += score_contribution
+            retrieval_methods[chunk_id].append(f"metadata(r={result.rank})")
+            
+            # Store chunk only if not already present from content search
+            # (content results have priority since they're already optimized)
+            if chunk_id not in chunk_map:
+                chunk_map[chunk_id] = result
+        
+        # Build final merged results
+        merged = []
+        for chunk_id, rrf_score in rrf_scores.items():
+            if chunk_id in chunk_map:
+                original_result = chunk_map[chunk_id]
+                
+                # Create method description
+                methods = retrieval_methods[chunk_id]
+                method_str = f"rrf_ensemble[{'+'.join(methods)}]"
+                
+                # Create new SearchResult with RRF score
+                merged.append(SearchResult(
+                    chunk=original_result.chunk,  # Already complete!
+                    score=rrf_score,
+                    retrieval_method=method_str,
+                    rank=None  # Will be assigned after sorting
+                ))
+        
+        logger.debug(f"RRF fusion produced {len(merged)} unique chunks")
+        
+        return merged

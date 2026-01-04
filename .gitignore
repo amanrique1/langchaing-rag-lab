@@ -1,7 +1,11 @@
 .env
 output_chunks/
 chroma_db/
+lancedb/
+filesystem_db/
 test_chroma_db/
+my_filesystem_db/
+my_vectordb/
 __pycache__/
 *.pyc
 *.pyo

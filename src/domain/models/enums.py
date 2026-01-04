@@ -1,8 +1,9 @@
 from enum import Enum
 
 class StorageType(str, Enum):
-    LOCAL = "local"
+    FILESYSTEM = "filesystem"
     CHROMA = "chroma"
+    LANCE = "lance"
 
 class LengthBasedChunkingMode(str, Enum):
     CHARACTER = "character"

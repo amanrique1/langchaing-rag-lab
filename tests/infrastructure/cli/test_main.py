@@ -16,7 +16,7 @@ def test_main_save_task(mock_run_chunking):
             strategy="semantic",
             config="{}",
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
             clean=False,
             dual_collection=True # Added default arg
         )
@@ -33,7 +33,7 @@ def test_main_talk_task(mock_run_talk):
             query="test query",
             top_k=5,
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
             candidates=20, # Added default
             rerank=True, # Added default
             llm_reranking=False, # Added default
@@ -52,7 +52,7 @@ def test_main_search_task(mock_run_search):
             query="test query",
             top_k=5,
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
             candidates=20, # Added default
             rerank=True, # Added default
             llm_reranking=False, # Added default
@@ -69,7 +69,7 @@ def test_main_clean_task(mock_clean_storage):
         mock_parse_args.return_value = MagicMock(
             task="clean",
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
             dual_collection=True # Added default
         )
         main.main()
@@ -239,7 +239,7 @@ def test_main_save_with_clean_flag(mock_run_chunking, mock_clean_storage):
             strategy="semantic",
             config="{}",
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
             clean=True,
             dual_collection=True # Default
         )
@@ -257,7 +257,7 @@ def test_main_invalid_json_config():
             strategy="semantic",
             config="{invalid json}",
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
             clean=False,
             dual_collection=True
         )
@@ -272,7 +272,7 @@ def test_main_delete_task():
         mock_parse_args.return_value = MagicMock(
             task="delete",
             local_dir="output_chunks",
-            chroma_collection="default_collection",
+            db_collection="default_collection",
         )
         with patch("builtins.print") as mock_print:
             main.main()
