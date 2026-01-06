@@ -16,7 +16,7 @@ class EncoderReranker(Reranker):
     """
 
     def __init__(
-        self, 
+        self,
         model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     ):
         """
@@ -28,7 +28,7 @@ class EncoderReranker(Reranker):
         """
         self.model_name = model_name
         self._device = self._detect_device()
-        
+
         try:
             logger.info(f"Loading CrossEncoder model: {model_name} on {self._device}...")
             self.model = CrossEncoder(model_name, device=self._device)
@@ -62,11 +62,11 @@ class EncoderReranker(Reranker):
         Returns:
             List[SearchResult]: The top_k results sorted by relevance.
         """
-        
+
         if not results:
             logger.warning("Reranker received empty results list.")
             return []
-        
+
         if not query.strip():
             logger.warning("Reranker received empty query. Returning original order.")
             return results[:top_k]
@@ -75,7 +75,7 @@ class EncoderReranker(Reranker):
             # 1. Filter valid results and create pairs in one pass
             # We filter out results with empty content to avoid model errors
             valid_results = [r for r in results if getattr(r.chunk, 'content', None)]
-            
+
             if not valid_results:
                 logger.warning("No valid content found in results to rerank.")
                 return []

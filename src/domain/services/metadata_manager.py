@@ -29,7 +29,7 @@ class MetadataManager:
             # Combine English and Spanish stop words
             english_sw = set(stopwords.words('english'))
             spanish_sw = set(stopwords.words('spanish'))
-            
+
             # Convert to list for YAKE compatibility
             cls._stop_words = list(english_sw.union(spanish_sw))
 
@@ -51,18 +51,18 @@ class MetadataManager:
             chunk_index: Index of the chunk
             total_chunks: Total number of chunks
             hierarchy: Hierarchy of the document (breadcrumbs)
-        
+
         Returns:
             Standardized dictionary for the Content Collection
         """
         cls._initialize_nltk()
-        
+
         source = doc_metadata.get("source", "")
         # Extracts 'report.pdf' from '/data/uploads/report.pdf'
         filename = os.path.basename(source) if source else "unknown"
-        
+
         clean_hierarchy = hierarchy if hierarchy else []
-        
+
         # 1. Determine Immediate Context
         section_context = clean_hierarchy[-1] if clean_hierarchy else "General"
 
@@ -75,12 +75,12 @@ class MetadataManager:
             "page": doc_metadata.get("page", None),
             "chunk_index": chunk_index,
             "total_chunks": total_chunks,
-            
+
             # --- Context / Hierarchy ---
-            "breadcrumbs": " > ".join(clean_hierarchy), 
+            "breadcrumbs": " > ".join(clean_hierarchy),
             "section_title": section_context,
             "root_doc_title": clean_hierarchy[0] if clean_hierarchy else filename,
-            
+
             # --- Content Enrichment ---
             "extracted_keywords": ", ".join(keywords),
             "language_scope": "en_es"
@@ -99,7 +99,7 @@ class MetadataManager:
 
         if metadata.get('section_title'):
             components.append(f"Section: {metadata['section_title']}")
-        
+
         # Breadcrumbs give the LLM hierarchical context
         if metadata.get('breadcrumbs'):
             components.append(f"Path: {metadata['breadcrumbs']}")
@@ -119,7 +119,7 @@ class MetadataManager:
         Args:
             text: Text to extract keywords from
             top_n: Number of top keywords to extract
-        
+
         Returns:
             List of top keywords
         """
@@ -135,14 +135,14 @@ class MetadataManager:
         # dedupLim=0.9: Deduplication threshold to avoid similar words
         # stopwords: combined English + Spanish list
         kw_extractor = yake.KeywordExtractor(
-            lan="en", 
-            n=1, 
-            dedupLim=0.9, 
-            top=top_n, 
+            lan="en",
+            n=1,
+            dedupLim=0.9,
+            top=top_n,
             features=None,
             stopwords=cls._stop_words
         )
-        
+
         # Extract keywords
         # Returns list of tuples: [('keyword', score), ...] where lower score is better
         keywords_with_scores = kw_extractor.extract_keywords(text)

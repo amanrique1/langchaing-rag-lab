@@ -9,11 +9,11 @@ from langchain_core.runnables import Runnable
 from langchain_core.output_parsers import StrOutputParser
 
 try:
-    reranking_query_template_path = Path("assets/reranking_query_template.txt")
-    
+    reranking_query_template_path = Path("assets/templates/reranking_query_template.txt")
+
     if not reranking_query_template_path.exists():
-        raise FileNotFoundError("The file assets/reranking_query_template.txt does not exist")
-    
+        raise FileNotFoundError("The file assets/templates/reranking_query_template.txt does not exist")
+
     RERANKING_QUERY_TEMPLATE_CONTENT = reranking_query_template_path.read_text()
 except FileNotFoundError as e:
     print(f"FATAL: Could not load reranking query template. {e}")
@@ -72,7 +72,7 @@ class LLMReranker(Reranker):
         for i, result in enumerate(results, start=1):
             content = result.chunk.content
             passages.append(f"[{i}] {content}")
-        
+
         passages_text = "\n\n".join(passages)
 
         # Get LLM response using the chain
@@ -109,7 +109,7 @@ class LLMReranker(Reranker):
             "query": query,
             "passages_text": passages_text
         })
-        
+
         return response
 
     def _parse_ranking_response(self, response: str, num_passages: int) -> List[int]:
@@ -127,28 +127,28 @@ class LLMReranker(Reranker):
             # Try to find JSON array in response
             start_idx = response.find('[')
             end_idx = response.rfind(']') + 1
-            
+
             if start_idx == -1 or end_idx == 0:
                 raise ValueError("No JSON array found in response")
-            
+
             json_str = response[start_idx:end_idx]
             rankings = json.loads(json_str)
-            
+
             # Validate rankings
             if not isinstance(rankings, list):
                 raise ValueError("Rankings is not a list")
-            
+
             # Convert to 0-indexed and validate range
             rankings = [r - 1 for r in rankings if isinstance(r, int) and 1 <= r <= num_passages]
-            
+
             # Add missing indices at the end
             all_indices = set(range(num_passages))
             ranked_indices = set(rankings)
             missing = all_indices - ranked_indices
             rankings.extend(sorted(missing))
-            
+
             return rankings
-            
+
         except Exception as e:
             # Fallback: return original order
             print(f"Failed to parse ranking response: {e}")
@@ -173,5 +173,5 @@ class LLMReranker(Reranker):
         for idx in rankings:
             if 0 <= idx < len(results):
                 reranked.append(results[idx])
-        
+
         return reranked

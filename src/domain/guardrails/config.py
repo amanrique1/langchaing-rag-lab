@@ -8,7 +8,7 @@ class GuardrailConfig:
     # -------------------------------------------------------------------------
     # INPUT LAYER CONFIGURATION
     # -------------------------------------------------------------------------
-    
+
     # Fast Rules: Regex patterns to block immediately (Zero Latency)
     # These catch standard jailbreak attempts.
     JAILBREAK_PATTERNS = [
@@ -21,12 +21,12 @@ class GuardrailConfig:
         r"DAN mode"
     ]
 
-    TEMPLATE_PATH = Path("assets/query_template.txt")
+    TEMPLATE_PATH = Path("assets/templates/query_template.txt")
 
     # -------------------------------------------------------------------------
     # OUTPUT LAYER CONFIGURATION
     # -------------------------------------------------------------------------
-    
+
     # Redaction Rules: Regex for PII to scrub from the output stream.
     # Format: {"LABEL": r"REGEX_PATTERN"}
     SENSITIVE_PATTERNS = {

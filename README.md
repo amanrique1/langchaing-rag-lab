@@ -9,7 +9,7 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 ### Core Features
 *   **Multiple Chunking Strategies**: Supports Length-Based, Structure-Based, Semantic, and Full Document Chunking.
 *   **Hexagonal Architecture**: Clean separation of concerns for robust and testable code.
-*   **Pluggable Storage Backends**: 
+*   **Pluggable Storage Backends**:
     *   **LanceDB** (Default): High-performance hybrid search with vector + BM25
     *   **ChromaDB**: Alternative vector store with dual collection support
     *   **FileSystem**: Local JSON storage for development/testing
@@ -145,24 +145,24 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Retrieval Services**:
         *   `SimpleRetriever`: Basic vector search with optional query expansion
         *   `EnsembleRetriever`: Advanced RRF-based retrieval combining content + metadata search
-    *   **Storage Backends**: 
+    *   **Storage Backends**:
         *   `LanceChunkStore` (Default): High-performance hybrid search (vector + BM25)
         *   `ChromaChunkStore`: Dual collection vector store
         *   `FileSystemChunkStore`: Local JSON storage
         *   **All stores support**: `collection_name` and `persist_directory` parameters
-    *   **AI Models**: 
+    *   **AI Models**:
         *   `GoogleGenAILanguageModel` (Gemini)
         *   `GoogleGenAIEmbeddingModel`
         *   `LlamaGuard` (Safety Adapter)
     *   **Query Expansion**:
         *   `HyDEGenerator`: Hypothetical document generation
         *   `StepBackGenerator`: Broader question generation
-    *   **Rerankers**: 
+    *   **Rerankers**:
         *   `EncoderReranker` (Local MS-Marco, Default)
         *   `LLMReranker` (Gemini-based, Optional)
-    *   **Data Ingestion**: 
+    *   **Data Ingestion**:
         *   `MarkdownDocumentLoader`: Markdown reader and parser
-    *   **CLI**: 
+    *   **CLI**:
         *   `main.py`: Command-line interface
 
 ### Storage Backend Architecture
@@ -279,30 +279,30 @@ The system resolves storage backends based on a strict priority system defined i
 └────────┬───────────────────────────────┘
          │
          ├──────────────────┐
-         ▼                  ▼                  
- ┌─────────────────┐  ┌──────────────────┐     
- │  Content Search │  │  Metadata Search │     
- │   (Semantic)    │  │   (Semantic)     │     
- └────────┬────────┘  └────────┬─────────┘     
-          │                    │               
-          └──────────┬─────────┘               
-                     ▼                         
-          ┌─────────────────────┐              
-          │ Reciprocal Rank     │              
-          │ Fusion (RRF)        │              
-          │ Score Merging       │              
-          └──────────┬──────────┘              
-                     ▼                         
-          ┌─────────────────────┐              
-          │   Deduplication     │              
-          │   (by chunk_id)     │              
-          └──────────┬──────────┘              
-                     ▼                         
-          ┌─────────────────────┐              
-          │  Top N Candidates   │              
-          │      (e.g., 20)     │              
-          └──────────┬──────────┘              
-                     ▼                         
+         ▼                  ▼
+ ┌─────────────────┐  ┌──────────────────┐
+ │  Content Search │  │  Metadata Search │
+ │   (Semantic)    │  │   (Semantic)     │
+ └────────┬────────┘  └────────┬─────────┘
+          │                    │
+          └──────────┬─────────┘
+                     ▼
+          ┌─────────────────────┐
+          │ Reciprocal Rank     │
+          │ Fusion (RRF)        │
+          │ Score Merging       │
+          └──────────┬──────────┘
+                     ▼
+          ┌─────────────────────┐
+          │   Deduplication     │
+          │   (by chunk_id)     │
+          └──────────┬──────────┘
+                     ▼
+          ┌─────────────────────┐
+          │  Top N Candidates   │
+          │      (e.g., 20)     │
+          └──────────┬──────────┘
+                     ▼
           ┌───────────────────────────────────┐
           │         Reranking Selection       │
           │  - Encoder-Based (Default, Local) │
@@ -442,8 +442,8 @@ Query expansion transforms the original user query to improve retrieval quality 
 **Example**:
 ```
 Original: "What is RAG?"
-HyDE Generated: "Retrieval Augmented Generation (RAG) is a technique that combines 
-information retrieval with language model generation. It works by first retrieving 
+HyDE Generated: "Retrieval Augmented Generation (RAG) is a technique that combines
+information retrieval with language model generation. It works by first retrieving
 relevant documents from a knowledge base, then using those documents as context..."
 ```
 
@@ -461,7 +461,7 @@ relevant documents from a knowledge base, then using those documents as context.
 
 **Example**:
 ```
-Original: "What happens to the pressure of an ideal gas if temperature doubles 
+Original: "What happens to the pressure of an ideal gas if temperature doubles
 and volume increases by a factor of 8?"
 Step-Back: "What are the physics principles behind the ideal gas law?"
 ```
@@ -541,7 +541,7 @@ This project implements a multi-layer security approach to ensure that the LLM p
           ▼
 ┌───────────────────────────────────┐
 │   Layer 3: Strict Grounding       │  <-- Prompt instructions
-│   Template: assets/query_template │
+│   Template: assets/templates/query_template │
 └─────────┬─────────────────────────┘
           │ (Enforce Safe Prompt)
           ▼
@@ -552,7 +552,7 @@ This project implements a multi-layer security approach to ensure that the LLM p
 
 ### Prompt Grounding Strategy
 
-The `InputGuard` uses a strict system prompt (`assets/query_template.txt`) that forces the model to stay "grounded" in the provided context. Key rules include:
+The `InputGuard` uses a strict system prompt (`assets/templates/query_template.txt`) that forces the model to stay "grounded" in the provided context. Key rules include:
 - **No Hallucinations**: Do not use outside knowledge.
 - **Strict Evidence**: Only answer if the answer is explicitly in the context.
 - **Safety**: Refuse to answer harmful or out-of-scope questions.

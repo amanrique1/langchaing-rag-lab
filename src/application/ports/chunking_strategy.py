@@ -9,10 +9,10 @@ class ChunkingStrategy(ABC):
     def chunk(self, documents: List[Document]) -> List[Chunk]:
         """
         Abstract method to chunk documents into chunks.
-        
+
         Args:
             documents: List of documents to chunk
-        
+
         Returns:
             List of chunks
         """

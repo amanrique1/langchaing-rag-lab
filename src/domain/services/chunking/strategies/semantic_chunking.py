@@ -28,14 +28,14 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         Initialize the Semantic Chunking Strategy.
 
         Args:
-            embedding_model (Any, optional): The embedding model instance. If None, tries to 
+            embedding_model (Any, optional): The embedding model instance. If None, tries to
                 load `GoogleGenerativeAIEmbeddings` using the `EMBEDDING_MODEL` env var.
             threshold_mode (SemanticChunkingThresholdType): Logic for calculating the split threshold.
                 Defaults to `PERCENTILE`.
-            threshold_value (float): The value for the threshold calculation. 
+            threshold_value (float): The value for the threshold calculation.
                 Defaults to 95.0 (meaning split at the 5% biggest changes in similarity).
             min_sentences (int): Minimum sentences per chunk. Defaults to 1.
-            max_sentences (int, optional): Maximum sentences per chunk (forced split). 
+            max_sentences (int, optional): Maximum sentences per chunk (forced split).
                 Defaults to None (unlimited).
         """
 
@@ -80,7 +80,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         """
         Splits text into a list of sentences using regular expressions.
 
-        This lightweight implementation avoids the heavy dependency of NLTK or SpaCy 
+        This lightweight implementation avoids the heavy dependency of NLTK or SpaCy
         while being robust enough for pre-processed Markdown.
 
         Args:
@@ -98,11 +98,11 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         Calculates the numerical similarity threshold based on the configured statistical mode.
 
         Args:
-            similarities (List[float]): A list of cosine similarity scores (0.0 to 1.0) 
+            similarities (List[float]): A list of cosine similarity scores (0.0 to 1.0)
                 between adjacent sentences.
 
         Returns:
-            float: The threshold value. Any similarity score *lower* than this value 
+            float: The threshold value. Any similarity score *lower* than this value
             is considered a "semantic dip" (a topic change).
 
         Raises:
@@ -174,7 +174,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
             start_index = 0
             for i, similarity in enumerate(similarities):
                 current_chunk_length = i - start_index + 1
-                
+
                 # A split happens if similarity drops below threshold (Topic Change)
                 should_break = similarity < split_threshold
 
@@ -210,7 +210,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         """
         source = doc.metadata.get("source", "")
         filename = os.path.basename(source) if source else "unknown"
-        
+
         metadata = {
             "source": source,
             "filename": filename,
@@ -220,9 +220,9 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         all_chunks.append(Chunk(content=doc.page_content, metadata=metadata))
 
     def _create_and_append_chunk(
-        self, 
-        all_chunks: List[Chunk], 
-        content: str, 
+        self,
+        all_chunks: List[Chunk],
+        content: str,
         doc: Document
     ) -> None:
         """
@@ -237,18 +237,18 @@ class SemanticChunkingStrategy(ChunkingStrategy):
             content (str): The text content of the chunk.
             doc (Document): The original source document.
         """
-        
+
         # Parse headers from the chunk text itself
         headers = self._extract_headers(content)
-        
+
         std_metadata = MetadataManager.normalize_metadata(
             doc_metadata=doc.metadata,
             chunk_content=content,
             chunk_index=len(all_chunks),
-            total_chunks=0, 
-            hierarchy=headers 
+            total_chunks=0,
+            hierarchy=headers
         )
-        
+
         all_chunks.append(Chunk(content=content, metadata=std_metadata))
 
     def _extract_headers(self, content: str) -> List[str]:

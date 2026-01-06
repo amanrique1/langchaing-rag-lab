@@ -22,11 +22,11 @@ DEFAULT_PERSIST_DIRECTORY = "./lancedb"
 class LanceChunkStore(ChunkStore):
     """
     A concrete implementation of ChunkStore using LanceDB.
-    
+
     This store implements hybrid search with:
     1. Vector search on content (semantic)
     2. BM25 (FTS) search on metadata fields (keyword-based)
-    
+
     Both search modes return COMPLETE chunks with content populated.
     """
 
@@ -51,16 +51,16 @@ class LanceChunkStore(ChunkStore):
         """
         if not embedding_model:
             raise ValueError("An embedding model must be provided to initialize LanceChunkStore.")
-        
+
         self.collection_name = collection_name or DEFAULT_COLLECTION_NAME
         self.persist_directory = persist_directory or DEFAULT_PERSIST_DIRECTORY
         self._embeddings = embedding_model
-        
+
         os.makedirs(self.persist_directory, exist_ok=True)
-        
+
         self.db = lancedb.connect(self.persist_directory)
         self._table: Optional[Table] = None
-        
+
         logger.info("LanceChunkStore initialized successfully")
 
     @property
@@ -90,7 +90,7 @@ class LanceChunkStore(ChunkStore):
     def save(self, chunks: List[Chunk]) -> None:
         """
         Persists a list of chunks into the vector database with FTS indexing.
-        
+
         Creates records with:
         - Vector embeddings for semantic search
         - Searchable metadata text for BM25 search
@@ -102,42 +102,42 @@ class LanceChunkStore(ChunkStore):
         if not chunks:
             logger.warning("No chunks to save")
             return
-        
+
         records = []
-        
+
         for chunk in chunks:
             chunk_id = getattr(chunk, "chunk_id", None) or self._generate_stable_id(chunk.content)
-            
+
             try:
                 vector = self._embeddings.embed_query(chunk.content)
             except Exception as e:
                 logger.error(f"Failed to generate embedding for chunk {chunk_id}: {e}")
                 continue
-            
+
             searchable_metadata = MetadataManager.create_searchable_string(chunk.metadata)
             safe_metadata = self._sanitize_metadata(chunk.metadata)
-            
+
             record = {
                 "chunk_id": chunk_id,
                 "content": chunk.content,
                 "vector": vector,
                 "searchable_metadata": searchable_metadata,
-                
+
                 "filename": safe_metadata.get("filename", ""),
                 "section_title": safe_metadata.get("section_title", ""),
                 "breadcrumbs": safe_metadata.get("breadcrumbs", ""),
                 "root_doc_title": safe_metadata.get("root_doc_title", ""),
                 "extracted_keywords": safe_metadata.get("extracted_keywords", ""),
-                
+
                 "page": safe_metadata.get("page"),
                 "chunk_index": safe_metadata.get("chunk_index", 0),
                 "total_chunks": safe_metadata.get("total_chunks", 0),
-                
+
                 "source": safe_metadata.get("source", ""),
                 "language_scope": safe_metadata.get("language_scope", "en_es"),
             }
             records.append(record)
-        
+
         if self._table is None:
             try:
                 self._table = self.db.create_table(
@@ -156,7 +156,7 @@ class LanceChunkStore(ChunkStore):
             except Exception as e:
                 logger.error(f"Failed to add records: {e}")
                 raise
-        
+
         self._create_fts_index()
 
     def search(
@@ -168,7 +168,7 @@ class LanceChunkStore(ChunkStore):
     ) -> List[SearchResult]:
         """
         Performs search with support for separate content/metadata retrieval.
-        
+
         IMPORTANT: Both modes return COMPLETE chunks with content populated.
         LanceDB stores everything in one table, so no hydration needed.
 
@@ -184,7 +184,7 @@ class LanceChunkStore(ChunkStore):
         if self.table is None:
             logger.warning("Cannot search: table not initialized")
             return []
-        
+
         if mode == "content":
             return self._search_content(query, top_k, filter)
         elif mode == "metadata":
@@ -193,9 +193,9 @@ class LanceChunkStore(ChunkStore):
             raise ValueError(f"Invalid mode: {mode}. Use 'content' or 'metadata'")
 
     def _search_content(
-        self, 
-        query: str, 
-        top_k: int, 
+        self,
+        query: str,
+        top_k: int,
         filter: Optional[Dict[str, Any]]
     ) -> List[SearchResult]:
         """Pure vector similarity search on content field."""
@@ -204,77 +204,77 @@ class LanceChunkStore(ChunkStore):
         except Exception as e:
             logger.error(f"Failed to generate query embedding: {e}")
             return []
-        
+
         try:
             search = self._table.search(query_vector).limit(top_k)
-            
+
             if filter:
                 filter_string = self._build_filter_string(filter)
                 search = search.where(filter_string)
-            
+
             lance_results = search.to_list()
-            
+
             return self._lance_to_search_results(lance_results, "semantic_content")
         except Exception as e:
             logger.error(f"Content search failed: {e}")
             return []
 
     def _search_metadata(
-        self, 
-        query: str, 
-        top_k: int, 
+        self,
+        query: str,
+        top_k: int,
         filter: Optional[Dict[str, Any]]
     ) -> List[SearchResult]:
         """
         BM25 full-text search on metadata fields ONLY.
-        
+
         Searches across:
         - metadata (consolidated metadata string)
         - filename
         - section_title
-        
+
         Does NOT search the content field - that's for vector search.
         Returns COMPLETE chunks since LanceDB stores everything in one table.
         """
         try:
             # Search using FTS (only metadata fields are indexed)
             search = self._table.search(self._sanitize_fts_query(query), query_type="fts").limit(top_k)
-            
+
             if filter:
                 filter_string = self._build_filter_string(filter)
                 search = search.where(filter_string)
-            
+
             lance_results = search.to_list()
 
             logger.info(f"Metadata search results found: {len(lance_results)}")
-            
+
             return self._lance_to_search_results(lance_results, "bm25_metadata")
         except Exception as e:
             logger.error(f"Metadata search failed: {e}")
             return []
 
     def search_by_filename(
-        self, 
-        query: str, 
+        self,
+        query: str,
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[SearchResult]:
         """
         BM25 search heavily weighted toward filename field.
-        
+
         Query syntax: "filename:<query> OR <query>"
         This boosts matches in the filename field.
         """
         sanitized_query = self._sanitize_fts_query(query)
         boosted_query = f"filename:{sanitized_query} OR {sanitized_query}"
-        
+
         try:
             search = self._table.search(boosted_query, query_type="fts").limit(top_k)
-            
+
             if filter:
                 filter_string = self._build_filter_string(filter)
                 search = search.where(filter_string)
-            
+
             lance_results = search.to_list()
             return self._lance_to_search_results(lance_results, "bm25_filename")
         except Exception as e:
@@ -282,27 +282,27 @@ class LanceChunkStore(ChunkStore):
             return []
 
     def search_by_section(
-        self, 
-        query: str, 
+        self,
+        query: str,
         top_k: int = 5,
         filter: Optional[Dict[str, Any]] = None
     ) -> List[SearchResult]:
         """
         BM25 search focused on section titles and breadcrumbs.
-        
+
         Query syntax: "section_title:<query> breadcrumbs:<query> OR <query>"
         This boosts matches in structural metadata.
         """
         sanitized_query = self._sanitize_fts_query(query)
         boosted_query = f"section_title:{sanitized_query} breadcrumbs:{sanitized_query} OR {sanitized_query}"
-        
+
         try:
             search = self._table.search(boosted_query, query_type="fts").limit(top_k)
-            
+
             if filter:
                 filter_string = self._build_filter_string(filter)
                 search = search.where(filter_string)
-            
+
             lance_results = search.to_list()
             return self._lance_to_search_results(lance_results, "bm25_section")
         except Exception as e:
@@ -312,7 +312,7 @@ class LanceChunkStore(ChunkStore):
     def get_by_ids(self, chunk_ids: List[str]) -> List[Chunk]:
         """
         Retrieves complete chunks by their IDs efficiently using batch scanning.
-        
+
         Args:
             chunk_ids (List[str]): The IDs to fetch.
 
@@ -321,44 +321,44 @@ class LanceChunkStore(ChunkStore):
         """
         if not chunk_ids or self.table is None:
             return []
-        
+
         try:
             id_set = set(chunk_ids)
             chunks = []
-            
+
             scanner = self._table.to_batches(
-                columns=["chunk_id", "content", "filename", "section_title", 
+                columns=["chunk_id", "content", "filename", "section_title",
                         "breadcrumbs", "root_doc_title", "extracted_keywords",
                         "page", "chunk_index", "total_chunks", "source", "language_scope"]
             )
-            
+
             for batch in scanner:
                 batch_dict = batch.to_pydict()
                 num_rows = len(batch_dict['chunk_id'])
-                
+
                 for i in range(num_rows):
                     chunk_id = batch_dict['chunk_id'][i]
-                    
+
                     if chunk_id in id_set:
                         metadata = self._extract_metadata_from_batch(batch_dict, i)
-                        
+
                         chunk = Chunk(
                             content=batch_dict['content'][i],
                             metadata=metadata
                         )
                         chunk.chunk_id = chunk_id
                         chunks.append(chunk)
-                        
+
                         id_set.remove(chunk_id)
                         if not id_set:
                             break
-                
+
                 if not id_set:
                     break
-            
+
             logger.debug(f"Retrieved {len(chunks)}/{len(chunk_ids)} chunks by ID")
             return chunks
-            
+
         except Exception as e:
             logger.error(f"Error retrieving chunks by ID: {e}")
             return self._get_by_ids_fallback(chunk_ids)
@@ -366,21 +366,21 @@ class LanceChunkStore(ChunkStore):
     def _get_by_ids_fallback(self, chunk_ids: List[str]) -> List[Chunk]:
         """
         Fallback method for get_by_ids using direct table scan.
-        
+
         Args:
             chunk_ids: List of chunk IDs to retrieve
-        
+
         Returns:
             List of Chunk objects retrieved from the table
         """
         try:
             chunks = []
             id_set = set(chunk_ids)
-            
+
             for batch in self._table.to_batches():
                 batch_dict = batch.to_pydict()
                 num_rows = len(batch_dict.get('chunk_id', []))
-                
+
                 for i in range(num_rows):
                     chunk_id = batch_dict['chunk_id'][i]
                     if chunk_id in id_set:
@@ -391,7 +391,7 @@ class LanceChunkStore(ChunkStore):
                         )
                         chunk.chunk_id = chunk_id
                         chunks.append(chunk)
-            
+
             logger.debug(f"Retrieved {len(chunks)} chunks via fallback method")
             return chunks
         except Exception as e:
@@ -401,11 +401,11 @@ class LanceChunkStore(ChunkStore):
     def _extract_metadata_from_batch(self, batch_dict: Dict, index: int) -> Dict[str, Any]:
         """
         Helper to extract metadata from a batch dictionary at a specific index.
-        
+
         Args:
             batch_dict: Dictionary containing batch data
             index: Index of the row to extract metadata from
-        
+
         Returns:
             Dictionary containing extracted metadata
         """
@@ -426,26 +426,26 @@ class LanceChunkStore(ChunkStore):
     def delete(self, chunk_id: str, where: Optional[Dict[str, Any]] = None, where_document: Optional[Dict[str, Any]] = None) -> None:
         """
         Deletes a chunk from the database.
-        
+
         Args:
             chunk_id: ID of the chunk to delete
             where: Optional filter conditions
             where_document: Optional document-level filter conditions
-        
+
         Returns:
             None
         """
         if self.table is None:
             logger.warning("Cannot delete: table not initialized")
             return
-        
+
         try:
             filter_string = f"chunk_id = '{chunk_id}'"
-            
+
             if where:
                 additional_filter = self._build_filter_string(where)
                 filter_string = f"{filter_string} AND {additional_filter}"
-            
+
             self._table.delete(filter_string)
             logger.info(f"Deleted chunk: {chunk_id}")
         except Exception as e:
@@ -467,51 +467,51 @@ class LanceChunkStore(ChunkStore):
     # ========================
 
     def _lance_to_search_results(
-        self, 
-        lance_results: List[Dict], 
+        self,
+        lance_results: List[Dict],
         method: str
     ) -> List[SearchResult]:
         """
         Convert LanceDB results to SearchResult domain objects with COMPLETE chunks.
-        
+
         Args:
             lance_results: List of LanceDB search results
             method: Search method used (e.g., "bm25", "cosine")
-        
+
         Returns:
             List of SearchResult objects
         """
         results = []
-        
+
         for rank, result in enumerate(lance_results, start=1):
             metadata = self._extract_metadata(result)
-            
+
             # LanceDB returns complete records - content is always present
             chunk = Chunk(
                 content=result["content"],
                 metadata=metadata
             )
             chunk.chunk_id = result["chunk_id"]
-            
+
             distance = result.get("_distance", 0)
             similarity_score = self._normalize_score(distance, method)
-            
+
             results.append(SearchResult(
                 chunk=chunk,
                 score=similarity_score,
                 retrieval_method=method,
                 rank=rank
             ))
-        
+
         return results
 
     def _extract_metadata(self, result: Dict) -> Dict[str, Any]:
         """
         Reconstruct metadata dictionary from LanceDB record.
-        
+
         Args:
             result: LanceDB search result record
-        
+
         Returns:
             Dictionary containing metadata fields
         """
@@ -532,11 +532,11 @@ class LanceChunkStore(ChunkStore):
     def _normalize_score(self, distance: float, method: str) -> float:
         """
         Normalize scores to 0-1 range based on search method.
-        
+
         Args:
             distance: Distance value to normalize
             method: Search method used (e.g., "bm25", "cosine")
-        
+
         Returns:
             Normalized score value
         """
@@ -550,10 +550,10 @@ class LanceChunkStore(ChunkStore):
     def _build_filter_string(self, filter: Dict[str, Any]) -> str:
         """
         Convert dictionary filter to LanceDB SQL-like WHERE clause.
-        
+
         Args:
             filter: Dictionary containing filter conditions
-        
+
         Returns:
             SQL-like WHERE clause string
         """
@@ -570,17 +570,17 @@ class LanceChunkStore(ChunkStore):
                 conditions.append(f"{key} = {value}")
             else:
                 conditions.append(f"{key} = '{str(value)}'")
-        
+
         return " AND ".join(conditions) if conditions else "1=1"
 
     @staticmethod
     def _sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Sanitizes metadata dictionaries for storage compatibility.
-        
+
         Args:
             metadata: Dictionary containing metadata fields
-        
+
         Returns:
             Sanitized metadata dictionary
         """
@@ -600,10 +600,10 @@ class LanceChunkStore(ChunkStore):
     def _generate_stable_id(content: str) -> str:
         """
         Generates a deterministic MD5 hash for the given string content.
-        
+
         Args:
             content: String content to hash
-        
+
         Returns:
             MD5 hash of the content
         """
@@ -614,10 +614,10 @@ class LanceChunkStore(ChunkStore):
         """
         Sanitize query string for FTS (Tantivy) by escaping special characters
         and normalizing whitespace/newlines.
-        
+
         Args:
             query (str): Raw query string
-            
+
         Returns:
             str: Sanitized query safe for FTS
         """
@@ -626,20 +626,20 @@ class LanceChunkStore(ChunkStore):
         sanitized = re.sub(r'\s+', ' ', query).strip()
 
         # Characters that have special meaning in Tantivy/Lucene query syntax
-        special_chars = ['\\', '+', '-', '!', '(', ')', '{', '}', 
+        special_chars = ['\\', '+', '-', '!', '(', ')', '{', '}',
                         '[', ']', '^', '"', '~', '*', '?', ':', '/']
-        
+
         # Escape backslash first to avoid double-escaping later additions
         sanitized = sanitized.replace('\\', '\\\\')
-        
+
         # Escape other special characters
         for char in special_chars[1:]:  # Skip backslash
             if char in sanitized:
                 sanitized = sanitized.replace(char, '\\' + char)
-        
+
         # Handle logical operators that might not be single chars (&&, ||)
         # we handle them explicitly to prevent boolean parsing.
         sanitized = sanitized.replace('&&', '\\&\\&')
         sanitized = sanitized.replace('||', '\\|\\|')
-        
+
         return sanitized

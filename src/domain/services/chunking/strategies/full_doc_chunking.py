@@ -10,7 +10,7 @@ class FullDocChunkingStrategy(ChunkingStrategy):
     """
     A concrete implementation of ChunkingStrategy that preserves documents as single chunks.
 
-    This strategy performs a 1-to-1 mapping: each input Document is converted 
+    This strategy performs a 1-to-1 mapping: each input Document is converted
     into exactly one Chunk. No splitting or text modification occurs.
     """
 
@@ -22,11 +22,11 @@ class FullDocChunkingStrategy(ChunkingStrategy):
             documents (List[Document]): A list of domain Document objects.
 
         Returns:
-            List[Chunk]: A list of Chunk objects. The length of this list will 
+            List[Chunk]: A list of Chunk objects. The length of this list will
             match the length of the input list.
         """
         all_chunks = []
-        
+
         for doc in documents:
             # Attempt to find a "Title" (H1) to act as the hierarchy context
             title = self._extract_h1_title(doc.page_content)
@@ -46,9 +46,9 @@ class FullDocChunkingStrategy(ChunkingStrategy):
                 metadata=std_metadata
             )
             all_chunks.append(chunk)
-            
+
         return all_chunks
-    
+
     def _extract_h1_title(self, content: str) -> str:
         """
         Helper to find the first H1 header (# Title) to use as context.

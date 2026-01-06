@@ -1,0 +1,5 @@
+Task: Check if there is unsafe content in 'User' messages according to our safety policy.
+
+<user>{text}
+
+Provide your safety assessment for the above user message:

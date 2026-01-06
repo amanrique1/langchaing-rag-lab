@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 class GuardrailModel(ABC):
     """Guardrail model interface for validating input text."""
-    
+
     @abstractmethod
     def validate(self, text: str) -> bool:
         """

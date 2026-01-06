@@ -51,7 +51,7 @@ def test_initialization_with_custom_parameters(mock_prompt_template, mock_chat_g
 def test_query_template_file_not_found():
     """Tests that FileNotFoundError is raised when query template file doesn't exist."""
     with patch("pathlib.Path.exists", return_value=False):
-        with pytest.raises(FileNotFoundError, match="The file assets/query_template.txt does not exist"):
+        with pytest.raises(FileNotFoundError, match="The file assets/templates/query_template.txt does not exist"):
             # Force re-import to trigger the module-level code
             import importlib
             from src.infrastructure.adapters.models import google_genai_language_model

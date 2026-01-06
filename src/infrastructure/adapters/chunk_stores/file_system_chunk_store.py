@@ -21,17 +21,17 @@ class FileSystemChunkStore(ChunkStore):
     A persistent chunk store backed by the local file system using JSON files.
 
     **Architecture:**
-    Each chunk is saved as an individual `.json` file containing its ID, content, 
+    Each chunk is saved as an individual `.json` file containing its ID, content,
     metadata, and pre-computed vector embedding.
 
     **Dual Collection Mode:**
     If enabled, maintains two parallel directories:
     1. `/content`: Stores the actual document chunks.
     2. `/metadata`: Stores text summaries of the metadata.
-    
+
     Both search modes return COMPLETE chunks with content populated.
     """
-    
+
     def __init__(
         self,
         collection_name: str = None,
@@ -41,7 +41,7 @@ class FileSystemChunkStore(ChunkStore):
     ):
         """
         Initialize the file system chunk store.
-        
+
         Args:
             collection_name (str, optional): Name used for subdirectory organization.
             embedding_model (EmbeddingModel, optional): The model used to generate embeddings.
@@ -54,10 +54,10 @@ class FileSystemChunkStore(ChunkStore):
         self.persist_directory = Path(persist_directory or DEFAULT_PERSIST_DIRECTORY)
         self.embedding_model = embedding_model
         self.dual_collection = kwargs.get('dual_collection', True)
-        
+
         self.output_dir = self.persist_directory / self.collection_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         if self.dual_collection:
             self.content_dir = self.output_dir / "content"
             self.metadata_dir = self.output_dir / "metadata"
@@ -66,7 +66,7 @@ class FileSystemChunkStore(ChunkStore):
         else:
             self.content_dir = self.output_dir
             self.metadata_dir = None
-        
+
         logger.info(f"FileSystemChunkStore initialized with collection: {self.collection_name} at {self.persist_directory}")
 
     def _get_file_path(self, directory: Path, chunk_id: str) -> Path:
@@ -77,7 +77,7 @@ class FileSystemChunkStore(ChunkStore):
     def save(self, chunks: List[Chunk]) -> None:
         """
         Persists a list of chunks to the file system.
-        
+
         Pre-computes vector embeddings for both content and metadata
         and saves them into the JSON file.
 
@@ -86,7 +86,7 @@ class FileSystemChunkStore(ChunkStore):
         """
         for chunk in chunks:
             chunk_id = getattr(chunk, "chunk_id", None) or str(hash(chunk.content))
-            
+
             # Pre-compute Content Embedding
             embedding = None
             if self.embedding_model:
@@ -102,15 +102,15 @@ class FileSystemChunkStore(ChunkStore):
                 "metadata": chunk.metadata,
                 "embedding": embedding
             }
-            
+
             content_file = self._get_file_path(self.content_dir, chunk_id)
             with open(content_file, "w", encoding="utf-8") as f:
                 json.dump(content_data, f, indent=2)
-            
+
             # Save Metadata (Dual Mode)
             if self.dual_collection and self.metadata_dir:
                 metadata_summary = self._create_metadata_summary(chunk)
-                
+
                 meta_embedding = None
                 if self.embedding_model:
                     meta_vector = self.embedding_model.embed_query(metadata_summary)
@@ -130,7 +130,7 @@ class FileSystemChunkStore(ChunkStore):
                 metadata_file = self._get_file_path(self.metadata_dir, chunk_id)
                 with open(metadata_file, "w", encoding="utf-8") as f:
                     json.dump(metadata_data, f, indent=2)
-        
+
         logger.info(f"Saved {len(chunks)} chunks to filesystem")
 
     def _create_metadata_summary(self, chunk: Chunk) -> str:
@@ -146,7 +146,7 @@ class FileSystemChunkStore(ChunkStore):
         if content_file.exists():
             content_file.unlink()
             logger.debug(f"Deleted content file for chunk: {chunk_id}")
-        
+
         if self.dual_collection and self.metadata_dir:
             metadata_file = self._get_file_path(self.metadata_dir, chunk_id)
             if metadata_file.exists():
@@ -162,7 +162,7 @@ class FileSystemChunkStore(ChunkStore):
     ) -> List[SearchResult]:
         """
         Performs a search over stored JSON files.
-        
+
         IMPORTANT: Both modes return COMPLETE chunks with content populated.
         - content mode: Searches content directory, returns full chunks
         - metadata mode: Searches metadata directory, then loads content from content directory
@@ -183,31 +183,31 @@ class FileSystemChunkStore(ChunkStore):
                 SearchResult(chunk=chunk, score=0.5, rank=i+1, retrieval_method="keyword")
                 for i, chunk in enumerate(chunks)
             ]
-        
+
         # Determine target directory for search
         search_dir = self.metadata_dir if (mode == "metadata" and self.metadata_dir) else self.content_dir
-        
+
         # Embed query once
         query_embedding = self.embedding_model.embed_query(query)
-        
+
         raw_results = []
         retrieval_method = f"semantic_{mode}"
-        
+
         for file_path in search_dir.glob("*.json"):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    
+
                     if filter and not self._matches_filter(data["metadata"], filter):
                         continue
-                    
+
                     chunk_embedding = data.get("embedding")
                     if not chunk_embedding:
-                        continue 
-                    
+                        continue
+
                     # Calculate Score
                     similarity = self._cosine_similarity(query_embedding, chunk_embedding)
-                    
+
                     raw_results.append({
                         "chunk_id": data["id"],
                         "score": float(similarity),
@@ -215,24 +215,24 @@ class FileSystemChunkStore(ChunkStore):
                     })
             except Exception as e:
                 logger.warning(f"Failed to process file {file_path}: {e}")
-                continue 
-        
+                continue
+
         # Sort descending by score
         raw_results.sort(key=lambda x: x["score"], reverse=True)
         top_results = raw_results[:top_k]
-        
+
         # Build final results with COMPLETE chunks
         final_results = []
-        
+
         if mode == "metadata":
             # For metadata search, we need to load content from content directory
             chunk_ids = [res["chunk_id"] for res in top_results]
             complete_chunks_map = {c.chunk_id: c for c in self.get_by_ids(chunk_ids)}
-            
+
             for rank, res in enumerate(top_results, start=1):
                 chunk_id = res["chunk_id"]
                 complete_chunk = complete_chunks_map.get(chunk_id)
-                
+
                 if complete_chunk:
                     final_results.append(SearchResult(
                         chunk=complete_chunk,
@@ -246,14 +246,14 @@ class FileSystemChunkStore(ChunkStore):
                 data = res["data"]
                 chunk = Chunk(content=data["content"], metadata=data["metadata"])
                 chunk.chunk_id = data["id"]
-                
+
                 final_results.append(SearchResult(
                     chunk=chunk,
                     score=1.0 / (1.0 + res["score"]),
                     retrieval_method=retrieval_method,
                     rank=rank
                 ))
-            
+
         return final_results
 
     def _keyword_search(self, query: str, top_k: int) -> List[Chunk]:
@@ -284,20 +284,20 @@ class FileSystemChunkStore(ChunkStore):
         """Computes the cosine similarity between two embedding vectors."""
         vec1_np = np.array(vec1)
         vec2_np = np.array(vec2)
-        
+
         dot_product = np.dot(vec1_np, vec2_np)
         norm1 = np.linalg.norm(vec1_np)
         norm2 = np.linalg.norm(vec2_np)
-        
+
         if norm1 == 0 or norm2 == 0:
             return 0.0
-        
+
         return dot_product / (norm1 * norm2)
 
     def get_by_ids(self, chunk_ids: List[str]) -> List[Chunk]:
         """
         Retrieves complete chunks by their IDs from the content directory.
-        
+
         This is highly efficient - O(k) where k is the number of requested IDs.
         Direct file access by ID without any scanning.
 
@@ -319,7 +319,7 @@ class FileSystemChunkStore(ChunkStore):
                         chunks.append(chunk)
                 except Exception as e:
                     logger.warning(f"Failed to load chunk {chunk_id}: {e}")
-        
+
         logger.debug(f"Retrieved {len(chunks)}/{len(chunk_ids)} chunks by ID")
         return chunks
 
@@ -328,9 +328,9 @@ class FileSystemChunkStore(ChunkStore):
         if self.output_dir.exists():
             shutil.rmtree(self.output_dir)
             logger.info(f"Cleared filesystem store: {self.output_dir}")
-        
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         if self.dual_collection:
             self.content_dir.mkdir(parents=True, exist_ok=True)
             if self.metadata_dir:

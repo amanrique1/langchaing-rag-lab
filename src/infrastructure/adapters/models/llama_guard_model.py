@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from langchain_ollama import OllamaLLM
 from src.application.ports.guardrail_model import GuardrailModel
 
@@ -14,11 +16,9 @@ class LlamaGuard(GuardrailModel):
 
     def validate(self, text: str) -> bool:
         # Explicit instructions for the model
-        prompt = f"""Task: Check if there is unsafe content in 'User' messages according to our safety policy.
-        
-        <user>{text}
-        
-        Provide your safety assessment for the above user message:"""
-        
+        template_path = Path("assets/templates/guard.txt")
+        template = template_path.read_text()
+        prompt = template.format(text=text)
+
         response = self.model.invoke(prompt)
         return "unsafe" not in response.lower()

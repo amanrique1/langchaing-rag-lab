@@ -13,7 +13,7 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
     A concrete implementation of ChunkingStrategy that splits text based on length constraints.
 
     This strategy utilizes LangChain's splitters to divide documents.
-    - For CHARACTER mode, it uses RecursiveCharacterTextSplitter with separators optimized 
+    - For CHARACTER mode, it uses RecursiveCharacterTextSplitter with separators optimized
       for Markdown (Paragraphs > Lines > Words).
     - For TOKEN mode, it splits strictly based on token counts.
 
@@ -47,7 +47,7 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
 
     def chunk(self, documents: List[Document]) -> List[Chunk]:
         """
-        Splits a list of domain Documents into smaller Chunks. 
+        Splits a list of domain Documents into smaller Chunks.
         It also enriches the metadata with chunk indexing information.
 
         Args:
@@ -81,7 +81,7 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
 
         all_chunks = []
         for doc in documents:
-            
+
             doc_chunks = splitter.split_documents([doc])
 
             total_chunks = len(doc_chunks)
@@ -89,10 +89,10 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
             # Map back to domain Chunk objects with enriched metadata
             for i, doc_chunk in enumerate(doc_chunks):
                 content = doc_chunk.page_content
-                
+
                 # Best Effort Context
                 headers_in_chunk = self._find_headers_in_text(content)
-                
+
                 # Standardize
                 # The 'extracted_keywords' are CRITICAL here.
                 # They act as the semantic glue for chunks that have no structural context.
@@ -109,7 +109,7 @@ class LengthBasedChunkingStrategy(ChunkingStrategy):
                     metadata=std_metadata
                 )
                 all_chunks.append(chunk)
-                
+
         return all_chunks
 
     def _find_headers_in_text(self, text: str) -> List[str]:

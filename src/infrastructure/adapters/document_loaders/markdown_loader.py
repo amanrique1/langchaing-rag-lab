@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 from pathlib import Path
 from application.ports.document_loader import DocumentLoader
-from langchain_core.documents import Document 
+from langchain_core.documents import Document
 from markitdown import MarkItDown
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class MarkdownDocumentLoader(DocumentLoader):
     """
     Standardizes all input files into Markdown format.
-    
+
     - .md files are read as-is to preserve exact structure for headers.
     - .pdf, .docx, etc., are converted to Markdown via MarkItDown.
     """
@@ -37,7 +37,7 @@ class MarkdownDocumentLoader(DocumentLoader):
             raise FileNotFoundError(f"Folder '{source}' does not exist")
 
         all_files = [p for p in data_path.rglob("*") if p.is_file() and not p.name.startswith(".")]
-        
+
         documents = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(self._process_file, p): p for p in all_files}
@@ -48,7 +48,7 @@ class MarkdownDocumentLoader(DocumentLoader):
                     if res: documents.extend(res)
                 except Exception as e:
                     logger.error(f"Error loading {futures[future]}: {e}")
-        
+
         return documents
 
     def _process_file(self, file_path: Path) -> List[Document]:

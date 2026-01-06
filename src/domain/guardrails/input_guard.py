@@ -13,7 +13,7 @@ class InputGuard:
         """
         self.guard_model = guardrail_model
         self.config = GuardrailConfig()
-        
+
         # 1. Pre-compile regex patterns for performance
         self.compiled_jailbreaks = [
             re.compile(p, re.IGNORECASE) for p in self.config.JAILBREAK_PATTERNS

@@ -257,21 +257,21 @@ This section provides complete examples to test all features with different stor
 #### 1. Save with Different Strategies
 ```bash
 # Full Doc Chunking (default LanceDB, default location)
-poetry run cli save data full_doc --clean
+poetry run cli save assets/data full_doc --clean
 
 # Length-based with custom collection and location
-poetry run cli save data length_based \
+poetry run cli save assets/data length_based \
   --collection 'length_docs' \
   --storage-path ./my_vectordb \
   --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}'
 
 # Structure-based with custom collection only
-poetry run cli save data structure_based \
+poetry run cli save assets/data structure_based \
   --collection 'structure_docs' \
   --config '{"chunk_size": 1500, "chunk_overlap": 100}'
 
 # Semantic with default settings
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --config '{"threshold_mode": "percentile", "threshold_value": 90.0}'
 ```
 
@@ -362,13 +362,13 @@ poetry run cli clean --collection 'length_docs' --storage-path ./my_vectordb --f
 #### 1. Save with ChromaDB
 ```bash
 # Save to ChromaDB with default location
-poetry run cli save data structure_based \
+poetry run cli save assets/data structure_based \
   --chroma \
   --collection 'chroma_docs' \
   --clean
 
 # Save to ChromaDB with custom location
-poetry run cli save data structure_based \
+poetry run cli save assets/data structure_based \
   --chroma \
   --collection 'chroma_docs' \
   --storage-path ./my_chroma_db \
@@ -432,19 +432,19 @@ poetry run cli clean --chroma --collection 'chroma_docs' --storage-path ./my_chr
 #### 1. Save with Different Strategies
 ```bash
 # Length-based with default location
-poetry run cli save data length_based \
+poetry run cli save assets/data length_based \
   --filesystem \
   --config '{"chunk_size": 1000, "chunk_overlap": 200, "mode": "character"}'
 
 # Structure-based with custom location and collection
-poetry run cli save data structure_based \
+poetry run cli save assets/data structure_based \
   --filesystem \
   --collection 'fs_docs' \
   --storage-path ./my_filesystem_db \
   --config '{"chunk_size": 1500, "chunk_overlap": 150}'
 
 # Semantic with default location
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --filesystem \
   --config '{"threshold_mode": "percentile", "threshold_value": 95.0}'
 ```
@@ -509,7 +509,7 @@ Complete workflow from scratch using LanceDB with custom storage locations:
 poetry run cli clean --storage-path /data/production/vectordb --force
 
 # 2. Save documents with semantic chunking to custom location
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --collection 'production_docs' \
   --storage-path /data/production/vectordb \
   --config '{"threshold_mode": "percentile", "threshold_value": 95.0}'
@@ -556,18 +556,18 @@ Test the same query across all three backends with custom locations:
 
 ```bash
 # Setup: Save to all backends with custom paths
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --collection 'lance_test' \
   --storage-path ./test_dbs/lance \
   --clean
 
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --chroma \
   --collection 'chroma_test' \
   --storage-path ./test_dbs/chroma \
   --clean
 
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --filesystem \
   --collection 'fs_test' \
   --storage-path ./test_dbs/filesystem \
@@ -727,19 +727,19 @@ echo "GOOGLE_API_KEY=your_key_here" > .env
 **Best Practices**:
 ```bash
 # Organize by project
-poetry run cli save data semantic --collection 'project_a_docs'
-poetry run cli save data semantic --collection 'project_b_docs'
+poetry run cli save assets/data semantic --collection 'project_a_docs'
+poetry run cli save assets/data semantic --collection 'project_b_docs'
 
 # Organize by data type
-poetry run cli save data semantic --collection 'technical_docs'
-poetry run cli save data semantic --collection 'business_docs'
+poetry run cli save assets/data semantic --collection 'technical_docs'
+poetry run cli save assets/data semantic --collection 'business_docs'
 
 # Use custom paths for isolation
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --collection 'prod_docs' \
   --storage-path /data/production/vectordb
 
-poetry run cli save data semantic \
+poetry run cli save assets/data semantic \
   --collection 'dev_docs' \
   --storage-path /data/development/vectordb
 ```
@@ -754,8 +754,8 @@ poetry run cli save data semantic \
 **Example**:
 ```bash
 # These use different locations
-poetry run cli save data semantic --collection 'docs'  # → ./lancedb/docs
-poetry run cli save data semantic --collection 'docs' --storage-path ./custom  # → ./custom/docs
+poetry run cli save assets/data semantic --collection 'docs'  # → ./lancedb/docs
+poetry run cli save assets/data semantic --collection 'docs' --storage-path ./custom  # → ./custom/docs
 ```
 
 ---

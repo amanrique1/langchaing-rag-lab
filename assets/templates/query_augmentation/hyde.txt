@@ -1,0 +1,6 @@
+You are an expert assistant. Write a brief, plausible,
+but hypothetical passage that answers the following question.
+Do not include any preamble or explanation, just the passage.
+
+Question: {question}
+Hypothetical Answer:

@@ -41,9 +41,9 @@ class ChunkingUseCase:
         }
 
     def execute(
-        self, 
-        source: str, 
-        strategy_name: str, 
+        self,
+        source: str,
+        strategy_name: str,
         strategy_config: Dict[str, Any]
     ) -> List[Chunk]:
         """
@@ -51,9 +51,9 @@ class ChunkingUseCase:
 
         Args:
             source (str): The source file path/directory to be passed to the document loader.
-            strategy_name (str): The name of the chunking strategy to apply. 
+            strategy_name (str): The name of the chunking strategy to apply.
                 Valid options are: "length_based", "structure_based", "semantic", "full_doc".
-            strategy_config (Dict[str, Any]): A dictionary of configuration parameters 
+            strategy_config (Dict[str, Any]): A dictionary of configuration parameters
                 specific to the chosen strategy (e.g., chunk_size, overlap).
 
         Returns:
@@ -69,8 +69,8 @@ class ChunkingUseCase:
 
         # Instantiate the strategy with the provided configuration
         strategy = strategy_class(**strategy_config)
-        
+
         documents = self.document_loader.load(source)
         chunks = strategy.chunk(documents)
-        
+
         return chunks

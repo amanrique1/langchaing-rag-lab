@@ -14,8 +14,8 @@ class GoogleGenAILanguageModel(LanguageModel):
     """
     An implementation of the LanguageModel port using Google's Gemini models via LangChain.
 
-    This class handles the execution of a pre-validated "safe prompt" 
-    against Google's Generative AI. It no longer handles guardrails 
+    This class handles the execution of a pre-validated "safe prompt"
+    against Google's Generative AI. It no longer handles guardrails
     internally, as that responsibility has been moved to the Use Case layer.
 
     Attributes:
@@ -24,8 +24,8 @@ class GoogleGenAILanguageModel(LanguageModel):
     """
 
     def __init__(
-        self, 
-        model_name: str = "gemini-2.5-flash", 
+        self,
+        model_name: str = "gemini-2.5-flash",
         temperature: float = 0.0,
         **kwargs: Any
     ):
@@ -33,24 +33,24 @@ class GoogleGenAILanguageModel(LanguageModel):
         Initializes the Google GenAI Language Model wrapper.
 
         Args:
-            model_name (str, optional): The name of the Gemini model to use. 
+            model_name (str, optional): The name of the Gemini model to use.
                                         Defaults to "gemini-2.5-flash".
-            temperature (float, optional): The temperature for generation (0.0 is deterministic). 
+            temperature (float, optional): The temperature for generation (0.0 is deterministic).
                                            Defaults to 0.0.
-            **kwargs: Additional keyword arguments passed directly to the 
+            **kwargs: Additional keyword arguments passed directly to the
                       ChatGoogleGenerativeAI constructor (e.g., max_retries, timeout).
         """
-        
+
         # Initialize the model with configuration passthrough
         self.model = ChatGoogleGenerativeAI(
-            model=model_name, 
+            model=model_name,
             temperature=temperature,
             **kwargs
         )
-        
+
         self.parser = StrOutputParser()
-        
-        # Note: We do not use a ChatPromptTemplate here because InputGuard.build_safe_query 
+
+        # Note: We do not use a ChatPromptTemplate here because InputGuard.build_safe_query
         # returns a fully formed string containing System Instructions, Context, and Question.
         self.chain: RunnableSerializable = self.model | self.parser
 
@@ -93,5 +93,3 @@ class GoogleGenAILanguageModel(LanguageModel):
         # Catch-all for API errors, Network issues, etc.
         logger.error("Unexpected System Error during LLM generation", exc_info=True)
         return "An unexpected error occurred while processing your request."
-
-    

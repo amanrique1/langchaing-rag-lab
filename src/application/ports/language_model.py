@@ -5,7 +5,7 @@ from src.domain.models.chunk import Chunk
 
 class LanguageModel(ABC):
     """Language model interface for generating answers."""
-    
+
     @abstractmethod
     def get_answer(self, prompt: str) -> str:
         """
