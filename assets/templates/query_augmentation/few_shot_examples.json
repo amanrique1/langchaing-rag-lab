@@ -1,0 +1,14 @@
+[
+    {
+        "question": "How tall is the Eiffel Tower? It looked so high when I was there last year",
+        "answer": "What is the height of the Eiffel Tower?"
+    },
+    {
+        "question": "1 oz is 28 grams, how many cm is 1 inch?",
+        "answer": "Convert 1 inch to cm."
+    },
+    {
+        "question": "What's the main point of the article? What did the author try to convey?",
+        "answer": "What is the main key point of this article?"
+    }
+]

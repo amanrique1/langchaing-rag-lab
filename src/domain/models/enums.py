@@ -20,3 +20,6 @@ class QueryExpansionStrategy(str, Enum):
     """Strategy for expanding queries to improve retrieval."""
     HYDE = "hyde"
     STEPBACK = "stepback"
+    SUBQUERIES = "subqueries"
+    ZERO_SHOT = "zero_shot"
+    FEW_SHOT = "few_shot"

@@ -1,6 +1,8 @@
 You are an expert at world knowledge. Your task is to step back
 and paraphrase a question to a more generic step-back question, which is easier to answer.
 
+If there are acronyms or words you are not familiar with, do not try to rephrase them.
+
 Here are a few examples:
 
 Original Question: What happens to the pressure, P, of an ideal gas if the temperature is
@@ -9,6 +11,3 @@ Step-back Question: What are the physics principles behind the ideal gas law?
 
 Original Question: Who was the spouse of Anna Karina from 1968 to 1974?
 Step-back Question: Who were the spouses of Anna Karina?
-
-Original Question: {question}
-Step-back Question:

@@ -1,12 +1,11 @@
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, BaseOutputParser
 from langchain_core.runnables import RunnableSerializable
 
 from src.application.ports.language_model import LanguageModel
-from src.domain.models.chunk import Chunk
 
 logger = logging.getLogger(__name__)
 
@@ -41,55 +40,113 @@ class GoogleGenAILanguageModel(LanguageModel):
                       ChatGoogleGenerativeAI constructor (e.g., max_retries, timeout).
         """
 
-        # Initialize the model with configuration passthrough
+        # Call parent constructor to set standard attributes
+        super().__init__(model_name=model_name, temperature=temperature, **kwargs)
+
+        # Initialize the LangChain model
         self.model = ChatGoogleGenerativeAI(
-            model=model_name,
-            temperature=temperature,
-            **kwargs
+            model=self.model_name,
+            temperature=self.temperature,
+            **self.config
         )
 
-        self.parser = StrOutputParser()
+        # Default parser for string output
+        self._default_parser = StrOutputParser()
 
-        # Note: We do not use a ChatPromptTemplate here because InputGuard.build_safe_query
-        # returns a fully formed string containing System Instructions, Context, and Question.
-        self.chain: RunnableSerializable = self.model | self.parser
+        logger.info(
+            f"GoogleGenAILanguageModel initialized: model={self.model_name}, "
+            f"temperature={self.temperature}"
+        )
 
-    def get_answer(self, prompt: str) -> str:
+    def get_answer(
+        self,
+        prompt: str,
+        parser: Optional[BaseOutputParser] = None
+    ) -> Any:
         """
         Synchronously generates an answer based on the provided prompt.
 
         Args:
             prompt (str): The fully formatted prompt.
+            parser (Optional[BaseOutputParser]): Optional output parser.
+                                                 If None, uses StrOutputParser.
 
         Returns:
-            str: The generated answer from the LLM.
+            Any: The generated answer. Type depends on the parser used.
+
+        Raises:
+            Exception: Wrapped as user-friendly error message.
         """
         try:
-            return self.chain.invoke(prompt)
+            # Build chain with appropriate parser
+            chain = self._build_chain(parser)
+            return chain.invoke(prompt)
         except Exception as e:
             return self._handle_exception(e)
 
-    async def aget_answer(self, prompt: str) -> str:
+    async def aget_answer(
+        self,
+        prompt: str,
+        parser: Optional[BaseOutputParser] = None
+    ) -> Any:
         """
         Asynchronously generates an answer based on the provided prompt.
 
         Args:
             prompt (str): The fully formatted prompt.
+            parser (Optional[BaseOutputParser]): Optional output parser.
 
         Returns:
-            str: The generated answer.
+            Any: The generated answer. Type depends on the parser used.
+
+        Raises:
+            Exception: Wrapped as user-friendly error message.
         """
         try:
-            return await self.chain.ainvoke(prompt)
+            # Build chain with appropriate parser
+            chain = self._build_chain(parser)
+            return await chain.ainvoke(prompt)
         except Exception as e:
             return self._handle_exception(e)
 
+    def _build_chain(self, parser: Optional[BaseOutputParser] = None) -> RunnableSerializable:
+        """
+        Builds a LangChain runnable with the specified parser.
+
+        Args:
+            parser (Optional[BaseOutputParser]): The output parser to use.
+                                                 If None, uses default StrOutputParser.
+
+        Returns:
+            RunnableSerializable: The configured chain (model | parser).
+        """
+        # Use provided parser or fall back to default
+        active_parser = parser if parser is not None else self._default_parser
+
+        # Build and return the chain
+        return self.model | active_parser
+
     def _handle_exception(self, e: Exception) -> str:
-        """Shared Error Handling Logic."""
+        """
+        Centralized error handling for LLM operations.
+
+        Args:
+            e (Exception): The exception that was raised.
+
+        Returns:
+            str: User-friendly error message.
+        """
         if isinstance(e, ValueError):
             logger.error(f"Configuration Error: {e}")
             return "An internal configuration error occurred."
 
-        # Catch-all for API errors, Network issues, etc.
-        logger.error("Unexpected System Error during LLM generation", exc_info=True)
+        if isinstance(e, TimeoutError):
+            logger.error(f"Timeout Error: {e}")
+            return "The request timed out. Please try again."
+
+        # Catch-all for API errors, network issues, etc.
+        logger.error(
+            f"Unexpected error during LLM generation with model={self.model_name}",
+            exc_info=True
+        )
         return "An unexpected error occurred while processing your request."

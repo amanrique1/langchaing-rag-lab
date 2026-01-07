@@ -243,7 +243,7 @@ LlmRerankArg = Annotated[
 ]
 ExpandArg = Annotated[
     Optional[QueryExpansionStrategy],
-    typer.Option("--expand", "-e", help="Query expansion strategy (hyde, stepback).")
+    typer.Option("--expand", "-e", help="Query expansion strategy (hyde, stepback, subqueries, zero_shot).")
 ]
 VerboseArg = Annotated[
     bool,

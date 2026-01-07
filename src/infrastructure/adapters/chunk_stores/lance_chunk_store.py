@@ -626,7 +626,7 @@ class LanceChunkStore(ChunkStore):
         sanitized = re.sub(r'\s+', ' ', query).strip()
 
         # Characters that have special meaning in Tantivy/Lucene query syntax
-        special_chars = ['\\', '+', '-', '!', '(', ')', '{', '}',
+        special_chars = ['\\', '`' ,'+', '-', '!', '(', ')', '{', '}',
                         '[', ']', '^', '"', '~', '*', '?', ':', '/']
 
         # Escape backslash first to avoid double-escaping later additions
