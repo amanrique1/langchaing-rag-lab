@@ -158,7 +158,7 @@ poetry run cli save ./docs.pdf length_based --collection prod_docs --storage-pat
 *   **`query`**: (Required) The question to ask or the topic to discuss.
 *   **`--top-k <number>`**: Optional number of final chunks to use for answer generation. Default is `5`.
 *   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
-*   **`--expand <strategy>`**: Optional query expansion strategy (`hyde` or `stepback`).
+*   **`--expand <strategy>`**: Optional query expansion strategy (`hyde`, `stepback`, `subqueries`, `zero_shot`, or `few_shot`).
 *   **`--no-rerank`**: Disable reranking completely.
 *   **`--llm-rerank`**: Use LLM-based reranking instead of the default Encoder-based reranking.
 *   **`--verbose`**: Enable verbose output for debugging.
@@ -169,7 +169,7 @@ poetry run cli save ./docs.pdf length_based --collection prod_docs --storage-pat
 *   **`query`**: (Required) The search term or phrase.
 *   **`--top-k <number>`**: Optional number of relevant chunks to retrieve. Default is `5`.
 *   **`--candidates <number>`**: Optional number of candidates to retrieve before reranking. Default is `20`.
-*   **`--expand <strategy>`**: Optional query expansion strategy (`hyde` or `stepback`).
+*   **`--expand <strategy>`**: Optional query expansion strategy (`hyde`, `stepback`, `subqueries`, `zero_shot`, or `few_shot`).
 *   **`--no-rerank`**: Disable reranking completely.
 *   **`--llm-rerank`**: Use LLM-based reranking instead of the default Encoder-based reranking.
 *   **`--verbose`**: Enable verbose output for debugging.
@@ -194,6 +194,9 @@ The enhanced pipeline is highly configurable:
 |--------|--------|--------|
 | `--expand hyde` | Use HyDE query expansion | None |
 | `--expand stepback` | Use Step-Back query expansion | None |
+| `--expand subqueries` | Use Subqueries query expansion | None |
+| `--expand zero_shot` | Use Zero-Shot query expansion | None |
+| `--expand few_shot` | Use Few-Shot query expansion | None |
 | `--single-collection` | Use only content search (Disable Ensemble) | False |
 | `--no-rerank` | Skip reranking step | False |
 | `--llm-rerank` | Enable Gemini-based reranking | False |
@@ -204,9 +207,17 @@ The enhanced pipeline is highly configurable:
 | `--filesystem` | Use FileSystem instead of LanceDB | False |
 | `--storage-path <path>` | Custom storage directory | None (uses default) |
 
+**Query Expansion Strategies**:
+- **`hyde`**: Generates a hypothetical document that would answer the query, then searches for similar content
+- **`stepback`**: Creates broader, conceptual versions of specific queries for better context retrieval
+- **`subqueries`**: Decomposes complex queries into multiple focused sub-questions for comprehensive answers
+- **`zero_shot`**: Uses prompt engineering to reformulate queries without examples
+- **`few_shot`**: Leverages example-based learning to improve query understanding and expansion
+
 **Performance Profiles**:
 - **Maximum Accuracy**: `--expand hyde --llm-rerank --candidates 30 --top-k 5` (Best results, highest latency & cost)
 - **High Accuracy**: `--expand stepback --llm-rerank --candidates 20 --top-k 5` (Excellent results, moderate latency)
+- **Complex Queries**: `--expand subqueries --candidates 25 --top-k 5` (Best for multi-part questions)
 - **Balanced (Default)**: `--candidates 20 --top-k 5` (Uses local Encoder reranking + LanceDB hybrid search, fast & free)
 - **Fast**: `--single-collection --no-rerank --top-k 5` (Lowest latency, no ensemble, no reranking)
 
@@ -300,6 +311,24 @@ poetry run cli search "What are the Server Error Codes?" \
   --top-k 3 \
   --candidates 10
 
+# With Subqueries expansion (for complex questions)
+poetry run cli search "What are the authentication methods and error handling strategies?" \
+  --expand subqueries \
+  --top-k 5 \
+  --candidates 25
+
+# With Zero-Shot expansion
+poetry run cli search "What are the Server Error Codes?" \
+  --expand zero_shot \
+  --top-k 5 \
+  --candidates 20
+
+# With Few-Shot expansion
+poetry run cli search "What are the Server Error Codes?" \
+  --expand few_shot \
+  --top-k 5 \
+  --candidates 20
+
 # Fast mode (no expansion, no reranking)
 poetry run cli search "What are the Server Error Codes?" \
   --top-k 3 \
@@ -330,6 +359,24 @@ poetry run cli talk "What are the Server Error Codes?" \
 # High accuracy (Step-Back + Encoder Reranking)
 poetry run cli talk "What are the Server Error Codes?" \
   --expand stepback \
+  --top-k 5 \
+  --candidates 20
+
+# Complex multi-part questions (Subqueries)
+poetry run cli talk "Explain authentication methods, rate limiting, and error codes" \
+  --expand subqueries \
+  --top-k 5 \
+  --candidates 25
+
+# Zero-Shot expansion
+poetry run cli talk "What are the Server Error Codes?" \
+  --expand zero_shot \
+  --top-k 5 \
+  --candidates 20
+
+# Few-Shot expansion
+poetry run cli talk "What are the Server Error Codes?" \
+  --expand few_shot \
   --top-k 5 \
   --candidates 20
 
@@ -390,6 +437,27 @@ poetry run cli search "What are the Server Error Codes?" \
   --collection 'chroma_docs' \
   --storage-path ./my_chroma_db \
   --top-k 5
+
+# ChromaDB with Subqueries expansion
+poetry run cli search "What are authentication and authorization mechanisms?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand subqueries \
+  --top-k 5
+
+# ChromaDB with Zero-Shot expansion
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand zero_shot \
+  --top-k 5
+
+# ChromaDB with Few-Shot expansion
+poetry run cli search "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand few_shot \
+  --top-k 5
 ```
 
 #### 3. Talk with ChromaDB
@@ -407,6 +475,27 @@ poetry run cli talk "What are the Server Error Codes?" \
   --chroma \
   --collection 'chroma_docs' \
   --storage-path ./my_chroma_db \
+  --top-k 5
+
+# ChromaDB with Subqueries for complex questions
+poetry run cli talk "How do I implement authentication, handle errors, and manage rate limits?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand subqueries \
+  --top-k 5
+
+# ChromaDB with Zero-Shot
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand zero_shot \
+  --top-k 5
+
+# ChromaDB with Few-Shot
+poetry run cli talk "What are the Server Error Codes?" \
+  --chroma \
+  --collection 'chroma_docs' \
+  --expand few_shot \
   --top-k 5
 ```
 
@@ -463,6 +552,24 @@ poetry run cli search "What are the Server Error Codes?" \
   --collection 'fs_docs' \
   --storage-path ./my_filesystem_db \
   --top-k 3
+
+# With Subqueries expansion
+poetry run cli search "What are the API design patterns and best practices?" \
+  --filesystem \
+  --expand subqueries \
+  --top-k 5
+
+# With Zero-Shot expansion
+poetry run cli search "What are the Server Error Codes?" \
+  --filesystem \
+  --expand zero_shot \
+  --top-k 5
+
+# With Few-Shot expansion
+poetry run cli search "What are the Server Error Codes?" \
+  --filesystem \
+  --expand few_shot \
+  --top-k 5
 ```
 
 #### 3. Talk with FileSystem
@@ -480,6 +587,24 @@ poetry run cli talk "What are the Server Error Codes?" \
 poetry run cli talk "What are the Server Error Codes?" \
   --filesystem \
   --expand hyde \
+  --top-k 5
+
+# With Subqueries
+poetry run cli talk "Explain versioning, authentication, and pagination strategies" \
+  --filesystem \
+  --expand subqueries \
+  --top-k 5
+
+# With Zero-Shot
+poetry run cli talk "What are the Server Error Codes?" \
+  --filesystem \
+  --expand zero_shot \
+  --top-k 5
+
+# With Few-Shot
+poetry run cli talk "What are the Server Error Codes?" \
+  --filesystem \
+  --expand few_shot \
   --top-k 5
 ```
 
@@ -536,12 +661,34 @@ poetry run cli talk "Explain API versioning strategies" \
   --top-k 5 \
   --candidates 30
 
-# 6. View storage info
+# 6. Complex multi-part questions with Subqueries
+poetry run cli talk "What are the authentication methods, rate limiting policies, and error handling best practices?" \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
+  --expand subqueries \
+  --top-k 5 \
+  --candidates 25
+
+# 7. Zero-Shot expansion
+poetry run cli talk "How should I handle API versioning?" \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
+  --expand zero_shot \
+  --top-k 5
+
+# 8. Few-Shot expansion
+poetry run cli talk "What are common API security concerns?" \
+  --collection 'production_docs' \
+  --storage-path /data/production/vectordb \
+  --expand few_shot \
+  --top-k 5
+
+# 9. View storage info
 poetry run cli info \
   --collection 'production_docs' \
   --storage-path /data/production/vectordb
 
-# 7. Clean up
+# 10. Clean up
 poetry run cli clean \
   --collection 'production_docs' \
   --storage-path /data/production/vectordb \
@@ -573,25 +720,43 @@ poetry run cli save assets/data semantic \
   --storage-path ./test_dbs/filesystem \
   --clean
 
-# Compare: Same query, different backends
-echo "=== LanceDB ==="
+# Compare: Same query, different backends, different expansion strategies
+echo "=== LanceDB with HyDE ==="
 poetry run cli search "API error handling" \
   --collection 'lance_test' \
   --storage-path ./test_dbs/lance \
+  --expand hyde \
   --top-k 3
 
-echo "=== ChromaDB ==="
+echo "=== ChromaDB with Step-Back ==="
 poetry run cli search "API error handling" \
   --chroma \
   --collection 'chroma_test' \
   --storage-path ./test_dbs/chroma \
+  --expand stepback \
   --top-k 3
 
-echo "=== FileSystem ==="
+echo "=== FileSystem with Subqueries ==="
 poetry run cli search "API error handling" \
   --filesystem \
   --collection 'fs_test' \
   --storage-path ./test_dbs/filesystem \
+  --expand subqueries \
+  --top-k 3
+
+echo "=== LanceDB with Zero-Shot ==="
+poetry run cli search "API error handling" \
+  --collection 'lance_test' \
+  --storage-path ./test_dbs/lance \
+  --expand zero_shot \
+  --top-k 3
+
+echo "=== ChromaDB with Few-Shot ==="
+poetry run cli search "API error handling" \
+  --chroma \
+  --collection 'chroma_test' \
+  --storage-path ./test_dbs/chroma \
+  --expand few_shot \
   --top-k 3
 
 # Cleanup
@@ -694,14 +859,31 @@ echo "GOOGLE_API_KEY=your_key_here" > .env
 - Use faster reranking (default Encoder) instead of LLM reranking
 - Reduce candidate count if using expansion + LLM reranking together
 
+**Strategy-Specific Notes**:
+- **`subqueries`**: Generates multiple sub-questions, may take longer but provides comprehensive coverage for complex queries
+- **`zero_shot` & `few_shot`**: Generally faster than HyDE/Step-Back as they focus on query reformulation
+- **`hyde`**: Slowest but most effective for finding semantically similar content
+- **`stepback`**: Good balance between speed and effectiveness for overly specific queries
+
 #### 3. **Query Expansion Not Improving Results**
 
 **Analysis**:
-- HyDE works best for questions with detailed answers in documents
-- Step-Back works best for overly specific questions
+- **HyDE** works best for questions with detailed answers in documents
+- **Step-Back** works best for overly specific questions
+- **Subqueries** works best for multi-part or complex questions that need decomposition
+- **Zero-Shot** works best when you want simple query reformulation without examples
+- **Few-Shot** works best when you want guided query understanding with minimal examples
 - For simple keyword searches, expansion may not help
 
-**Recommendation**: A/B test with and without expansion for your use case.
+**Recommendation**: A/B test with and without expansion for your use case. Try different strategies:
+```bash
+# Compare expansion strategies for the same query
+poetry run cli search "complex question" --expand hyde
+poetry run cli search "complex question" --expand stepback
+poetry run cli search "complex question" --expand subqueries
+poetry run cli search "complex question" --expand zero_shot
+poetry run cli search "complex question" --expand few_shot
+```
 
 #### 4. **Which Storage Backend Should I Use?**
 
@@ -756,6 +938,40 @@ poetry run cli save assets/data semantic \
 # These use different locations
 poetry run cli save assets/data semantic --collection 'docs'  # → ./lancedb/docs
 poetry run cli save assets/data semantic --collection 'docs' --storage-path ./custom  # → ./custom/docs
+```
+
+#### 8. **Choosing the Right Expansion Strategy**
+
+**Decision Guide**:
+
+| Query Type | Recommended Strategy | Reason |
+|------------|---------------------|---------|
+| Simple keyword search | None or `zero_shot` | Minimal overhead, direct matching |
+| Specific technical question | `hyde` | Generates hypothetical detailed answer |
+| Overly specific query | `stepback` | Broadens to conceptual level |
+| Multi-part complex question | `subqueries` | Decomposes into focused sub-questions |
+| Need quick reformulation | `zero_shot` | Fast, no example overhead |
+| Domain-specific queries | `few_shot` | Leverages examples for better understanding |
+
+**Examples**:
+```bash
+# Simple: "API authentication"
+poetry run cli search "API authentication"  # No expansion needed
+
+# Specific: "What is JWT token expiration handling?"
+poetry run cli search "What is JWT token expiration handling?" --expand hyde
+
+# Overly specific: "How to fix 401 error in POST /api/v2/users endpoint?"
+poetry run cli search "How to fix 401 error in POST /api/v2/users endpoint?" --expand stepback
+
+# Complex: "Explain authentication, authorization, and rate limiting"
+poetry run cli search "Explain authentication, authorization, and rate limiting" --expand subqueries
+
+# Need reformulation: "server problems"
+poetry run cli search "server problems" --expand zero_shot
+
+# Domain-specific: "microservices communication patterns"
+poetry run cli search "microservices communication patterns" --expand few_shot
 ```
 
 ---
