@@ -300,6 +300,7 @@ class ChromaChunkStore(ChunkStore):
 
                 # Sort by original rank
                 results.sort(key=lambda x: x.rank)
+            logger.info(f"Metadata search results found: {len(results)}")
         else:
             # Content search - already have complete chunks
             for rank, (doc, raw_score) in enumerate(docs_with_scores, start=1):

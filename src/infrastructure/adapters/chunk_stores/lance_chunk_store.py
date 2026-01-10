@@ -615,31 +615,44 @@ class LanceChunkStore(ChunkStore):
         Sanitize query string for FTS (Tantivy) by escaping special characters
         and normalizing whitespace/newlines.
 
+        - Preserves simple terms and phrases
+        - Removes problematic syntax
+        - Falls back to token-based search if query is too complex
+
         Args:
             query (str): Raw query string
 
         Returns:
-            str: Sanitized query safe for FTS
+            str: Sanitized safe query for FTS
         """
-        # 1. Normalize whitespace: replace newlines/tabs with spaces and collapse multiple spaces
-        #    This fixes the 'Syntax Error' caused by multi-line queries.
-        sanitized = re.sub(r'\s+', ' ', query).strip()
+        if not query or not query.strip():
+            return '""'
 
-        # Characters that have special meaning in Tantivy/Lucene query syntax
-        special_chars = ['\\', '`' ,'+', '-', '!', '(', ')', '{', '}',
-                        '[', ']', '^', '"', '~', '*', '?', ':', '/']
+        # Normalize whitespace
+        query = re.sub(r'\s+', ' ', query).strip()
 
-        # Escape backslash first to avoid double-escaping later additions
-        sanitized = sanitized.replace('\\', '\\\\')
+        # Check if query is "simple" (no special chars except space, hyphen, dot)
+        if re.match(r'^[\w\s\.\-]+$', query):
+            return query  # Already safe
 
-        # Escape other special characters
-        for char in special_chars[1:]:  # Skip backslash
-            if char in sanitized:
-                sanitized = sanitized.replace(char, '\\' + char)
+        # For complex queries, extract and escape phrases and terms
+        result_parts = []
 
-        # Handle logical operators that might not be single chars (&&, ||)
-        # we handle them explicitly to prevent boolean parsing.
-        sanitized = sanitized.replace('&&', '\\&\\&')
-        sanitized = sanitized.replace('||', '\\|\\|')
+        # Extract quoted phrases first
+        phrases = re.findall(r'"([^"]*)"', query)
+        for phrase in phrases:
+            # Escape internal quotes and add back
+            safe_phrase = phrase.replace('\\', '\\\\').replace('"', '\\"')
+            result_parts.append(f'"{safe_phrase}"')
 
-        return sanitized
+        # Remove quoted sections and extract remaining terms
+        query_without_phrases = re.sub(r'"[^"]*"', ' ', query)
+        tokens = re.findall(r'[\w][\w\.\-]*', query_without_phrases)
+
+        # Add tokens that are long enough
+        result_parts.extend([t for t in tokens if len(t) >= 2])
+
+        if not result_parts:
+            return '""'
+
+        return ' '.join(result_parts)
