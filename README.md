@@ -14,12 +14,14 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
     *   **ChromaDB**: Alternative vector store with dual collection support
     *   **FileSystem**: Local JSON storage for development/testing
     *   **All stores support**: `collection_name` and `persist_directory` for flexible configuration
-*   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `talk`, `search`, `clean`, `info`).
+*   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `talk`, `search`, `chat`, `clean`, `info`).
+*   **Conversational Memory**: Modern LangChain message-based conversation history with sliding window memory.
+*   **Session Management**: Multi-session support with persistent conversation context per user/session.
 *   **Google Gemini Integration**: Uses Google's embedding and language models.
 *   **RAG Evaluation**: Built-in evaluation suite using the Ragas library to measure performance.
 
 ### 🚀 Enhanced RAG Architecture
-*   **Query Expansion Strategies**: Transform queries for better retrieval using HyDE or Step-Back prompting.
+*   **Query Expansion Strategies**: Transform queries for better retrieval using HyDE, Step-Back, Subqueries, Zero-Shot, or Few-Shot prompting.
 *   **Metadata-Aware Search**: Dual collection support for content and metadata with separate embeddings.
 *   **Ensemble Retrieval**: Combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**.
 *   **Dual Reranking Strategies**:
@@ -28,6 +30,14 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 *   **Security Guardrails**: Multi-layer protection using Regex Fast Rules and Semantic Guardrails (LlamaGuard).
 *   **Strict Grounding**: System instructions enforced via prompt templates to prevent hallucinations and jailbreaks.
 *   **Rich Metadata Extraction**: Automatically extracts headers, filenames, and section titles.
+
+### 💬 Conversational Features
+*   **Message-Based History**: Uses LangChain's modern `ChatMessageHistory` with proper message types (HumanMessage, AIMessage).
+*   **Sliding Window Memory**: Configurable conversation window (default: 5 exchanges) to maintain context without overwhelming the LLM.
+*   **Session Persistence**: Conversations cached by `(user_id, session_id)` for seamless multi-session support.
+*   **Interactive Commands**: Built-in `/history`, `/stats`, `/sessions`, `/help`, `/clear` commands for session management.
+*   **Auto-Session IDs**: Automatic generation of session identifiers for quick testing.
+*   **Memory Introspection**: Real-time statistics about conversation state (message count, exchanges, window size).
 
 ## Technologies Used
 
@@ -49,6 +59,7 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
   - [Three-Layer Architecture](#three-layer-architecture)
   - [Layers](#layers)
   - [Storage Backend Architecture](#storage-backend-architecture)
+  - [Conversation Memory Architecture](#conversation-memory-architecture)
   - [Data Flow Overview](#data-flow-overview)
 - [Enhanced RAG Architecture Deep Dive](#enhanced-rag-architecture-deep-dive)
   - [Storage Backend Strategy](#storage-backend-strategy)
@@ -60,6 +71,10 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
   - [Available Strategies](#available-strategies)
   - [Query Expansion Architecture](#query-expansion-architecture)
   - [Performance Considerations](#performance-considerations)
+- [Conversation Memory System](#conversation-memory-system)
+  - [Memory Architecture](#memory-architecture)
+  - [Session Management](#session-management)
+  - [Memory Window Strategy](#memory-window-strategy)
 - [Security & Grounding](#security--grounding)
   - [Multi-Layer Security Workflow](#multi-layer-security-workflow)
   - [Prompt Grounding Strategy](#prompt-grounding-strategy)
@@ -110,6 +125,7 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 │  - Create dependencies                  │
 │  - Inject into services                 │
 │  - Coordinate service calls             │
+│  - Manage conversation sessions         │
 └──────────────┬──────────────────────────┘
                │
 ┌──────────────▼──────────────────────────┐
@@ -123,6 +139,7 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 - **Entry Points** are thin adapters that only parse input and call use cases
 - **Use Cases** orchestrate dependencies and coordinate services (easy to add new entry points like API)
 - **Services** contain reusable business logic that can be shared across use cases
+- **Session Management** lives at the container level for proper lifecycle control
 
 ### Layers
 
@@ -135,6 +152,7 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 
 *   **Application Layer** (`src/application`): Orchestrates business logic via Use Cases and defines Port interfaces.
     *   **Use Cases**:
+        *   `ChatUseCase`: Orchestrates conversational workflow with modern LangChain message-based memory.
         *   `TalkUseCase`: Manages the end-to-end "Chat with Data" pipeline and orchestrates security grounding.
         *   `SearchUseCase`: Orchestrates complex retrieval and reranking for search queries.
         *   `ChunkingUseCase`: Manages document decomposition strategies.
@@ -163,7 +181,9 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Data Ingestion**:
         *   `MarkdownDocumentLoader`: Markdown reader and parser
     *   **CLI**:
-        *   `main.py`: Command-line interface
+        *   `main.py`: Command-line interface with session-aware chat mode
+    *   **Dependency Management**:
+        *   `DependencyContainer`: Session-aware dependency injection with conversation caching
 
 ### Storage Backend Architecture
 
@@ -203,6 +223,54 @@ The system resolves storage backends based on a strict priority system defined i
 - Development/testing
 - Small datasets (<1000 chunks)
 - No database dependencies needed
+
+### Conversation Memory Architecture
+
+The chat system uses modern LangChain patterns for conversation management:
+
+```
+┌──────────────────────────────────────────────┐
+│         DependencyContainer                  │
+│  ┌────────────────────────────────────────┐  │
+│  │  Chat Session Cache                    │  │
+│  │  Key: (user_id, session_id)            │  │
+│  │  Value: ChatUseCase instance           │  │
+│  │  ┌──────────────────────────────────┐  │  │
+│  │  │ ChatUseCase                      │  │  │
+│  │  │  ├─ ConversationBufferWindowMemory│  │  │
+│  │  │  │   └─ ChatMessageHistory        │  │  │
+│  │  │  │       ├─ HumanMessage         │  │  │
+│  │  │  │       ├─ AIMessage            │  │  │
+│  │  │  │       └─ (k exchanges max)    │  │  │
+│  │  │  ├─ SearchUseCase                │  │  │
+│  │  │  ├─ LanguageModel                │  │  │
+│  │  │  └─ InputGuard                   │  │  │
+│  │  └──────────────────────────────────┘  │  │
+│  └────────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
+```
+
+**Key Components**:
+
+1. **ChatMessageHistory**: LangChain's modern message storage
+   - Stores messages as proper `HumanMessage` and `AIMessage` objects
+   - Type-safe message handling
+   - Supports message metadata and additional attributes
+
+2. **ConversationBufferWindowMemory**: Sliding window memory manager
+   - Keeps last `k` conversation exchanges (default: 5)
+   - Automatically manages message list size
+   - Provides dictionary-based memory variable access
+
+3. **Session Caching**: Container-level session management
+   - Sessions cached by `(user_id, session_id)` tuple
+   - Resumable conversations across CLI invocations
+   - Memory persists until explicitly cleared or container reset
+
+4. **Memory Introspection**: Real-time conversation state
+   - `get_conversation_history()`: Returns formatted message list
+   - `get_memory_stats()`: Provides session statistics
+   - `clear_memory()`: Clears conversation while preserving session
 
 ### Data Flow Overview
 
@@ -258,79 +326,84 @@ The system resolves storage backends based on a strict priority system defined i
 └────────────────────────────────────────────────────┘
 ```
 
-#### Enhanced Talk Command Data Flow
+#### Enhanced Chat Command Data Flow
 ```
 ┌─────────────────┐
 │   User Query    │
 └────────┬────────┘
          │
          ▼
-┌─────────────────────────────────────┐
-│   Query Expansion (Optional)        │
-│   - HyDE: Generate hypothetical doc │
-│   - StepBack: Broader question      │
-└────────┬────────────────────────────┘
-         │ (Original + Expanded Query)
-         ▼
-┌────────────────────────────────────────┐
-│      Retrieval Strategy Selection      │
-│  - Dual Collection: EnsembleRetriever  │
-│  - Single Collection: SimpleRetriever  │
-└────────┬───────────────────────────────┘
+┌──────────────────────────────────────┐
+│  DependencyContainer                 │
+│  Get/Create ChatUseCase for session  │
+│  Key: (user_id, session_id)          │
+└────────┬─────────────────────────────┘
          │
-         ├──────────────────┐
-         ▼                  ▼
- ┌─────────────────┐  ┌──────────────────┐
- │  Content Search │  │  Metadata Search │
- │   (Semantic)    │  │   (Semantic)     │
- └────────┬────────┘  └────────┬─────────┘
-          │                    │
-          └──────────┬─────────┘
-                     ▼
-          ┌─────────────────────┐
-          │ Reciprocal Rank     │
-          │ Fusion (RRF)        │
-          │ Score Merging       │
-          └──────────┬──────────┘
-                     ▼
-          ┌─────────────────────┐
-          │   Deduplication     │
-          │   (by chunk_id)     │
-          └──────────┬──────────┘
-                     ▼
-          ┌─────────────────────┐
-          │  Top N Candidates   │
-          │      (e.g., 20)     │
-          └──────────┬──────────┘
-                     ▼
-          ┌───────────────────────────────────┐
-          │         Reranking Selection       │
-          │  - Encoder-Based (Default, Local) │
-          │  - LLM-Based (--llm-rerank)       │
-          └──────────┬────────────────────────┘
-                     ▼
-          ┌─────────────────────┐
-          │   Top K Results     │
-          │      (e.g., 5)      │
-          └──────────┬──────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────┐
-│        Input Guard (Safety)         │
-│  - Layer 1: Regex Fast Rules        │
-│  - Layer 2: LlamaGuard Semantic     │
-│  - Layer 3: Grounding via Template  │
-└────────┬────────────────────────────┘
-         │ (Safe Prompt)
          ▼
-┌─────────────────────────────────────┐
-│      Language Model (Gemini)        │
-│  - Answer Generation                │
-└──────────┬──────────────────────────┘
-           ▼
-┌─────────────────────┐
-│  Generated Answer   │
-└─────────────────────┘
+┌──────────────────────────────────────┐
+│         ChatUseCase                  │
+│  ┌────────────────────────────────┐  │
+│  │ Load Conversation History      │  │
+│  │ from ChatMessageHistory        │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │ Query Expansion (Optional)     │  │
+│  │ - HyDE/StepBack/Subqueries...  │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │   Retrieval Strategy           │  │
+│  │   (SearchUseCase)              │  │
+│  │   - EnsembleRetriever          │  │
+│  │   - SimpleRetriever            │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │  Reranking (Optional)          │  │
+│  │  - Encoder-Based (Default)     │  │
+│  │  - LLM-Based (--llm-rerank)    │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │  Build Context-Aware Prompt    │  │
+│  │  - Recent conversation history │  │
+│  │  - Retrieved RAG context       │  │
+│  │  - Current query               │  │
+│  │  - System instructions         │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │  Input Guard (Safety)          │  │
+│  │  - Regex Fast Rules            │  │
+│  │  - LlamaGuard Semantic         │  │
+│  │  - Grounding via Template      │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │  Language Model (Gemini)       │  │
+│  │  Generate Answer               │  │
+│  └────────┬───────────────────────┘  │
+│           │                           │
+│           ▼                           │
+│  ┌────────────────────────────────┐  │
+│  │  Save to Memory                │  │
+│  │  HumanMessage(query)           │  │
+│  │  AIMessage(response)           │  │
+│  └────────────────────────────────┘  │
+└──────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Return Response │
+│ Display to User │
+└─────────────────┘
 ```
 
 ---
@@ -466,6 +539,42 @@ and volume increases by a factor of 8?"
 Step-Back: "What are the physics principles behind the ideal gas law?"
 ```
 
+#### 3. **Subqueries Decomposition**
+
+**How it works**:
+- Breaks complex multi-part questions into focused sub-questions
+- Retrieves documents for each sub-question independently
+- Combines results for comprehensive answer coverage
+
+**When to use**:
+- Complex questions with multiple aspects
+- Multi-hop reasoning requirements
+- When comprehensive coverage is more important than speed
+
+#### 4. **Zero-Shot Expansion**
+
+**How it works**:
+- Uses prompt engineering to reformulate queries without examples
+- Quick query understanding and expansion
+- Minimal latency overhead
+
+**When to use**:
+- Need fast query reformulation
+- Simple to moderate complexity queries
+- When example-based learning isn't necessary
+
+#### 5. **Few-Shot Expansion**
+
+**How it works**:
+- Leverages example-based learning for query understanding
+- Provides context through examples
+- Improves domain-specific query handling
+
+**When to use**:
+- Domain-specific technical queries
+- When you have example query patterns
+- Need guided query understanding
+
 ### Query Expansion Architecture
 
 ```
@@ -478,6 +587,9 @@ Step-Back: "What are the physics principles behind the ideal gas law?"
 │  QueryExpander (Optional)  │
 │  - HyDEGenerator           │
 │  - StepBackGenerator       │
+│  - SubqueriesGenerator     │
+│  - ZeroShotExpander        │
+│  - FewShotExpander         │
 └────────┬───────────────────┘
          │
          ▼
@@ -506,12 +618,112 @@ Step-Back: "What are the physics principles behind the ideal gas law?"
 | **No Expansion** | None | Free | Simple queries, well-matched vocabulary |
 | **HyDE** | +1 LLM call | Low | Complex questions, technical content |
 | **Step-Back** | +1 LLM call | Low | Specific questions, multi-hop reasoning |
+| **Subqueries** | +1 LLM call | Low | Multi-part complex questions |
+| **Zero-Shot** | +1 LLM call | Low | Fast reformulation needs |
+| **Few-Shot** | +1 LLM call | Low | Domain-specific queries |
 
 **Key Design Principles**:
 - **Single Parameter**: Retrievers accept one `query_expander` object (not multiple strategy flags)
 - **Automatic Activation**: If a query expander is injected, it's used automatically
 - **Type-Safe**: Uses `QueryExpansionStrategy` enum for validation
 - **Cached**: Query expanders are singleton instances per strategy type
+
+---
+
+## Conversation Memory System
+
+The chat system implements modern LangChain patterns for robust conversation management.
+
+### Memory Architecture
+
+**Component Hierarchy**:
+
+```
+ChatUseCase
+  ├─ ConversationBufferWindowMemory (LangChain)
+  │    ├─ memory_key: "chat_history"
+  │    ├─ k: 5 (configurable window size)
+  │    ├─ return_messages: True
+  │    └─ chat_memory: ChatMessageHistory
+  │         ├─ messages: List[BaseMessage]
+  │         │    ├─ HumanMessage(content="...")
+  │         │    ├─ AIMessage(content="...")
+  │         │    └─ (repeating pattern)
+  │         └─ Methods:
+  │              ├─ add_message()
+  │              ├─ clear()
+  │              └─ messages property
+  ├─ SearchUseCase (RAG retrieval)
+  ├─ LanguageModel (Answer generation)
+  └─ InputGuard (Security validation)
+```
+
+**Key Features**:
+
+1. **Message Types**: Proper `HumanMessage` and `AIMessage` objects
+   - Type-safe message handling
+   - Metadata support for future extensions
+   - Compatible with LangChain ecosystem
+
+2. **Sliding Window**: Automatic context management
+   - Keeps last `k` exchanges (default: 5)
+   - Prevents context overflow
+   - Maintains recent relevant history
+
+3. **Memory Variables**: Dictionary-based access
+   ```python
+   memory.load_memory_variables({})
+   # Returns: {"chat_history": [HumanMessage(...), AIMessage(...), ...]}
+   ```
+
+4. **Context Building**: Structured prompt assembly
+   - System instructions
+   - Conversation history
+   - Retrieved RAG context
+   - Current query
+   - Grounding instructions
+
+### Session Management
+
+**Container-Level Caching**:
+
+```python
+# DependencyContainer maintains session cache
+_chat_sessions: Dict[Tuple[str, str], ChatUseCase] = {}
+
+# Session key structure
+session_key = (user_id, session_id)
+
+# Benefits:
+# - Conversations persist across CLI calls
+# - Memory survives individual command executions
+# - Multiple concurrent sessions supported
+# - Explicit session cleanup available
+```
+
+**Session Lifecycle**:
+
+1. **Creation**: First call to `get_chat_use_case()`
+   - Creates new `ChatUseCase` instance
+   - Initializes empty `ChatMessageHistory`
+   - Caches in container by session key
+
+2. **Resumption**: Subsequent calls with same identifiers
+   - Returns existing `ChatUseCase` instance
+   - Conversation history intact
+   - Memory window automatically maintained
+
+3. **Termination**: Explicit cleanup
+   - `/clear` command: Clears history, keeps session
+   - `/exit` command: Ends interactive mode, session cached
+   - `clear_chat_session()`: Removes from container
+
+**Session Identification**:
+
+| Identifier | Default | Purpose |
+|-----------|---------|---------|
+| `user_id` | `"default_user"` | User identity/tracking |
+| `session_id` | Auto-generated UUID | Conversation grouping |
 
 ---
 
@@ -556,3 +768,8 @@ The `InputGuard` uses a strict system prompt (`assets/templates/query_template.t
 - **No Hallucinations**: Do not use outside knowledge.
 - **Strict Evidence**: Only answer if the answer is explicitly in the context.
 - **Safety**: Refuse to answer harmful or out-of-scope questions.
+- **Conversation Awareness**: Consider chat history while staying grounded in documentation.
+
+---
+
+**🚀 Ready to start?** Head over to [USAGE.md](USAGE.md) for installation instructions and examples!

@@ -352,6 +352,10 @@ class ChromaChunkStore(ChunkStore):
             logger.error(f"Error retrieving chunks by ID: {e}")
             return []
 
+    def get_client(self) -> Any:
+        """Return the Chroma client."""
+        return self.content_collection._client
+
     def clear(self) -> None:
         """Irreversibly deletes all data in the vector store and removes local files."""
         if self.collection_name:

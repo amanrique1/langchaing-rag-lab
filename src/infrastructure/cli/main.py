@@ -1,20 +1,20 @@
 import typer
 from dotenv import load_dotenv
 
-# Import the command functions from the routers
-from src.infrastructure.cli.commands import ingest, query, info
+# Import individual command modules
+from src.infrastructure.cli.commands import ingest, info, talk, search, chat
 
 app = typer.Typer(
     help="Document Chunking and Retrieval CLI - Chunk documents and interact with them via natural language.",
     add_completion=False
 )
 
-# Register commands
-# We register them manually to keep the CLI flat (e.g. "cli save" instead of "cli ingest save")
+# Register commands from separate modules
 app.command(name="save")(ingest.save)
 app.command(name="clean")(ingest.clean_command)
-app.command(name="talk")(query.talk)
-app.command(name="search")(query.search)
+app.command(name="talk")(talk.talk)
+app.command(name="search")(search.search)
+app.command(name="chat")(chat.chat)
 app.command(name="info")(info.info)
 
 @app.callback()

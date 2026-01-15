@@ -5,6 +5,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 class GoogleGenAIEmbeddingModel(EmbeddingModel):
     def __init__(self, model_name: str = "models/embedding-001"):
+        super().__init__(model_name=model_name)
         self.embedding_model = GoogleGenerativeAIEmbeddings(model=model_name)
 
     def embed_query(self, text: str) -> List[float]:

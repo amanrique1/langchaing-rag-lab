@@ -91,6 +91,16 @@ class ChunkStore(ABC):
         pass
 
     @abstractmethod
+    def get_client(self) -> Any:
+        """
+        Return the underlying database client or connection.
+
+        This allows other components (like memory managers) to reuse the
+        same connection/client without re-initializing it.
+        """
+        pass
+
+    @abstractmethod
     def clear(self) -> None:
         """
         Clear all chunks from the store.

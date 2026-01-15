@@ -6,6 +6,7 @@ filesystem_db/
 test_chroma_db/
 my_filesystem_db/
 my_vectordb/
+.mem0_db/
 __pycache__/
 *.pyc
 *.pyo

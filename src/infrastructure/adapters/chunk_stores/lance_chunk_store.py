@@ -451,6 +451,10 @@ class LanceChunkStore(ChunkStore):
         except Exception as e:
             logger.error(f"Failed to delete chunk {chunk_id}: {e}")
 
+    def get_client(self) -> Any:
+        """Return the LanceDB connection."""
+        return self.db
+
     def clear(self) -> None:
         """Irreversibly deletes all data in the table."""
         try:

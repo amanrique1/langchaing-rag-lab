@@ -96,8 +96,9 @@ poetry run cli [SUBCOMMAND] [ARGUMENTS] [OPTIONS]
 | Subcommand | Description |
 | :--- | :--- |
 | `save` | Chunks and saves documents from a source folder using a specified strategy. |
-| `talk` | Asks a question, retrieves relevant documents, and generates a conversational answer. |
 | `search` | Searches for document chunks most relevant to a query and displays them. |
+| `talk` | Asks a question, retrieves relevant documents, and generates a conversational answer. |
+| `chat` | Starts an interactive chat session with memory. |
 | `clean` | Clears all data from a specified storage location. |
 | `info` | Displays information about the current storage configuration. |
 
@@ -185,6 +186,37 @@ poetry run cli save ./docs.pdf length_based --collection prod_docs --storage-pat
 `poetry run cli info [OPTIONS]`
 *   **`--verbose`**: Enable verbose output.
 *   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
+
+#### `chat` Subcommand
+`poetry run cli chat [OPTIONS]`
+
+**Description**: Start an interactive chat session with conversation memory using modern LangChain message-based history.
+
+**Options**:
+*   **`--user-id <str>`**: User ID for session context (default: `default_user`)
+*   **`--session-id <str>`**: Session ID to group conversation turns (auto-generated if not provided)
+*   **`--window <number>`**: Number of conversation exchanges (pairs) to keep in memory (default: `5`)
+*   **`--top-k <number>`**: Number of final chunks to use for answer generation (default: `5`)
+*   **`--candidates <number>`**: Number of candidates to retrieve before reranking (default: `20`)
+*   **`--expand <strategy>`**: Query expansion strategy (`hyde`, `stepback`, `subqueries`, `zero_shot`, or `few_shot`)
+*   **`--no-rerank`**: Disable reranking completely
+*   **`--llm-rerank`**: Use LLM-based reranking instead of default Encoder-based reranking
+*   **`--verbose`**: Enable verbose output for debugging
+*   **Storage Options**: `--collection`, `--storage-path`, `--lance`, `--chroma`, `--filesystem`, `--single-collection`
+
+**Interactive Commands** (inside Chat Mode):
+*   **`/exit` or `/quit`**: End the chat session and save conversation history
+*   **`/clear`**: Clear the current conversation history
+*   **`/history`**: Display recent conversation in a formatted table
+*   **`/stats`**: Show session statistics (messages, exchanges, memory window)
+*   **`/sessions`**: Display all active chat sessions in the container
+*   **`/help`**: Show available commands and usage tips
+
+**Session Management**:
+- Chat sessions are cached by `(user_id, session_id)` pair
+- Resuming with the same IDs continues the previous conversation
+- Each session maintains independent conversation history
+- Sessions persist until explicitly cleared or container is reset
 
 ### Configuration Options
 
@@ -387,7 +419,19 @@ poetry run cli talk "What are the Server Error Codes?" \
   --no-rerank
 ```
 
-#### 4. Manage LanceDB Collections
+#### 4. Chat with LanceDB (Interactive with Persistent Memory)
+```bash
+# Default LanceDB chat
+poetry run cli chat
+
+# Chat with specific collection and user ID
+poetry run cli chat --collection 'structure_docs' --user-id 'andres_m' --window 5
+
+# Chat with HyDE expansion and LLM reranking
+poetry run cli chat --collection 'structure_docs' --expand hyde --llm-rerank --top-k 5
+```
+
+#### 5. Manage LanceDB Collections
 ```bash
 # Info about default collection
 poetry run cli info
@@ -499,7 +543,13 @@ poetry run cli talk "What are the Server Error Codes?" \
   --top-k 5
 ```
 
-#### 4. Manage ChromaDB Collections
+#### 4. Chat with ChromaDB (Interactive)
+```bash
+# Chat with ChromaDB backend
+poetry run cli chat --chroma --collection 'chroma_docs'
+```
+
+#### 5. Manage ChromaDB Collections
 ```bash
 # Info (default location)
 poetry run cli info --chroma --collection 'chroma_docs'

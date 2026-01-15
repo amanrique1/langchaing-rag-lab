@@ -31,6 +31,7 @@ from src.application.use_cases.search_use_case import SearchUseCase
 from src.application.use_cases.talk_use_case import TalkUseCase
 from src.application.use_cases.storage_use_case import StorageUseCase
 from src.application.use_cases.chunking_use_case import ChunkingUseCase
+from src.application.use_cases.chat_use_case import ChatUseCase
 
 
 class DependencyContainer:
@@ -67,6 +68,9 @@ class DependencyContainer:
         self._talk_use_cases: Dict[Tuple[StorageConfig, bool, Optional[str]], TalkUseCase] = {}
         self._storage_use_cases: Dict[StorageConfig, StorageUseCase] = {}
         self._chunking_use_case: Optional[ChunkingUseCase] = None
+
+        # Chat sessions (stateful) - Key: (user_id, session_id)
+        self._chat_sessions: Dict[Tuple[str, str], ChatUseCase] = {}
 
     # ========== Tier 0: Retriever Factory ==========
 
@@ -140,12 +144,6 @@ class DependencyContainer:
     def get_query_expander(self, strategy: QueryExpansionStrategy) -> Optional[QueryExpander]:
         """
         Get or create a query expander based on strategy.
-
-        Args:
-            strategy (QueryExpansionStrategy): 'hyde' or 'stepback'.
-
-        Returns:
-            Optional[QueryExpander]: The query expander instance.
         """
         if not strategy:
             return None
@@ -160,20 +158,6 @@ class DependencyContainer:
     def get_chunk_store(self, config: StorageConfig) -> ChunkStore:
         """
         Get cached chunk store based on StorageConfig.
-
-        All stores support:
-        - collection_name: For organizing/naming the data
-        - persist_directory: For custom storage locations (None = use store default)
-        - dual_collection: For ensemble retrieval strategies
-
-        Args:
-            config (StorageConfig): The storage configuration.
-
-        Returns:
-            ChunkStore: The initialized chunk store.
-
-        Raises:
-            ValueError: If storage type is unknown or initialization fails.
         """
         if config not in self._chunk_stores:
             storage_type = config.storage_type.value if hasattr(config.storage_type, 'value') else str(config.storage_type)
@@ -235,20 +219,12 @@ class DependencyContainer:
     ) -> SearchUseCase:
         """
         Get or create a search use case.
-
-        Args:
-            config (StorageConfig): Storage configuration.
-            use_llm_reranking (bool): Whether to use LLM reranking.
-            expansion_strategy (Optional[str]): 'hyde', 'stepback', or None.
-
-        Returns:
-            SearchUseCase: Configured search use case.
         """
         cache_key = (config, use_llm_reranking, expansion_strategy)
 
         if cache_key not in self._search_use_cases:
             retriever = self.get_retriever(config, expansion_strategy)
-            reranker = (self.get_llm_reranker() if use_llm_reranking 
+            reranker = (self.get_llm_reranker() if use_llm_reranking
                        else self.get_encoder_reranker())
 
             self._search_use_cases[cache_key] = SearchUseCase(
@@ -266,14 +242,6 @@ class DependencyContainer:
     ) -> TalkUseCase:
         """
         Get or create a talk use case.
-
-        Args:
-            config (StorageConfig): Storage configuration.
-            use_llm_reranking (bool): Whether to use LLM reranking.
-            expansion_strategy (Optional[str]): 'hyde', 'stepback', or None.
-
-        Returns:
-            TalkUseCase: Configured talk use case.
         """
         cache_key = (config, use_llm_reranking, expansion_strategy)
 
@@ -287,3 +255,108 @@ class DependencyContainer:
             )
 
         return self._talk_use_cases[cache_key]
+
+    def get_chat_use_case(
+        self,
+        config: StorageConfig,
+        use_llm_reranking: bool = False,
+        expansion_strategy: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        memory_k: int = 5
+    ) -> ChatUseCase:
+        """
+        Get or create a chat use case with session management.
+
+        ChatUseCase is stateful (holds conversation memory), so instances are cached
+        per (user_id, session_id) pair to maintain conversation context.
+
+        Args:
+            config: Storage configuration
+            use_llm_reranking: Whether to use LLM reranking
+            expansion_strategy: Query expansion strategy
+            user_id: User identifier (defaults to "default_user")
+            session_id: Session identifier (defaults to "default_session")
+            memory_k: Number of conversation exchanges to retain in memory
+
+        Returns:
+            ChatUseCase: Chat use case instance with conversation history
+        """
+        # Normalize identifiers
+        user_id = user_id or "default_user"
+        session_id = session_id or "default_session"
+
+        session_key = (user_id, session_id)
+
+        # Return existing session if available
+        if session_key in self._chat_sessions:
+            existing_chat = self._chat_sessions[session_key]
+            # Verify it's using the same config
+            if existing_chat.search_use_case == self.get_search_use_case(
+                config, use_llm_reranking, expansion_strategy
+            ):
+                return existing_chat
+
+        # Create new chat session
+        search_uc = self.get_search_use_case(config, use_llm_reranking, expansion_strategy)
+
+        chat_use_case = ChatUseCase(
+            language_model=self.get_language_model(),
+            search_use_case=search_uc,
+            input_guard=self.get_input_guard(),
+            user_id=user_id,
+            session_id=session_id,
+            memory_k=memory_k
+        )
+
+        # Cache the session
+        self._chat_sessions[session_key] = chat_use_case
+
+        return chat_use_case
+
+    def clear_chat_session(self, user_id: str, session_id: str) -> bool:
+        """
+        Clear a specific chat session from the container.
+
+        Args:
+            user_id: User identifier
+            session_id: Session identifier
+
+        Returns:
+            bool: True if session was found and cleared, False otherwise
+        """
+        session_key = (user_id, session_id)
+        if session_key in self._chat_sessions:
+            self._chat_sessions[session_key].clear_memory()
+            del self._chat_sessions[session_key]
+            return True
+        return False
+
+    def get_active_sessions(self) -> list[Dict[str, str]]:
+        """
+        Get list of active chat sessions.
+
+        Returns:
+            List of dicts containing session information
+        """
+        return [
+            {
+                "user_id": user_id,
+                "session_id": session_id,
+                **chat.get_memory_stats()
+            }
+            for (user_id, session_id), chat in self._chat_sessions.items()
+        ]
+
+    def clear_all_chat_sessions(self) -> int:
+        """
+        Clear all active chat sessions.
+
+        Returns:
+            int: Number of sessions cleared
+        """
+        count = len(self._chat_sessions)
+        for chat in self._chat_sessions.values():
+            chat.clear_memory()
+        self._chat_sessions.clear()
+        return count
