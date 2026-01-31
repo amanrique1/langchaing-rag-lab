@@ -35,11 +35,15 @@ def save(
     validate_source_path(source)
     storage_config = resolve_storage_config(collection, storage_path, lance, chroma, filesystem, single_collection)
 
+    # Resolve dependencies once
+    container = get_container()
+    ingestion_use_case = container.get_ingestion_use_case(storage_config)
+
     if clean:
-        _clean_storage(storage_config, force=force)
+        _clean_storage(ingestion_use_case, force=force)
 
     chunk_config = ChunkingConfig(source, strategy, config)
-    _run_chunking(chunk_config, storage_config, verbose)
+    _run_ingestion(ingestion_use_case, chunk_config, verbose)
 
 def clean_command(
     force: Annotated[bool, typer.Option("--force", "-f")] = False,
@@ -56,12 +60,20 @@ def clean_command(
     log_command_params("clean", locals(), verbose)
 
     storage_config = resolve_storage_config(collection, storage_path, lance, chroma, filesystem, single_collection)
-    _clean_storage(storage_config, force=force)
+
+    # Resolve dependencies
+    container = get_container()
+    ingestion_use_case = container.get_ingestion_use_case(storage_config)
+
+    _clean_storage(ingestion_use_case, force=force)
 
 # --- Internal Helpers ---
 
-def _run_chunking(chunk_config, storage_config, verbose):
-    container = get_container()
+def _run_ingestion(ingestion_use_case, chunk_config, verbose):
+    """
+    Executes the ingestion pipeline (Load -> Chunk -> Save) using the
+    provided IngestionUseCase.
+    """
     strategy_params = chunk_config.strategy_config.copy()
     convert_strategy_enums(chunk_config.strategy, strategy_params)
 
@@ -69,28 +81,33 @@ def _run_chunking(chunk_config, storage_config, verbose):
 
     try:
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
-            task = progress.add_task("Chunking documents...", total=None)
-            chunking_use_case = container.get_chunking_use_case()
-            chunks = chunking_use_case.execute(chunk_config.source_path, chunk_config.strategy, strategy_params)
+            task = progress.add_task("Ingesting documents...", total=None)
 
-            progress.update(task, description="Saving chunks...")
-            storage_use_case = container.get_storage_use_case(storage_config)
-            storage_use_case.save(chunks)
+            # The use case handles loading, chunking, and saving atomically
+            chunks = ingestion_use_case.ingest(
+                chunk_config.source_path,
+                chunk_config.strategy,
+                strategy_params
+            )
 
-        console.print(f"[green]✓[/green] Successfully processed {len(chunks)} chunks.")
+            progress.update(task, completed=100)
+
+        console.print(f"[green]✓[/green] Successfully processed and saved {len(chunks)} chunks.")
     except Exception as e:
-        logger.error(f"Chunking failed: {e}", exc_info=verbose)
+        logger.error(f"Ingestion failed: {e}", exc_info=verbose)
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=EXIT_CODE_ERROR)
 
-def _clean_storage(storage_config, force):
+def _clean_storage(ingestion_use_case, force):
+    """
+    Clears storage using the provided IngestionUseCase.
+    """
     if not force and not typer.confirm("⚠️  Delete all stored data?"):
         raise typer.Exit()
 
     try:
-        container = get_container()
         console.print("[blue]Clearing storage...[/blue]")
-        container.get_storage_use_case(storage_config).clear()
+        ingestion_use_case.clear_storage()
         console.print("[green]✓[/green] Storage cleared.")
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")

@@ -428,7 +428,7 @@ poetry run cli chat
 poetry run cli chat --collection 'structure_docs' --user-id 'andres_m' --window 5
 
 # Chat with HyDE expansion and LLM reranking
-poetry run cli chat --collection 'structure_docs' --expand hyde --llm-rerank --top-k 5
+poetry run cli chat --collection 'structure_docs' --user-id 'andres_m' --window 5 --expand hyde --llm-rerank --top-k 5
 ```
 
 #### 5. Manage LanceDB Collections
@@ -899,7 +899,17 @@ poetry run ruff format .
 echo "GOOGLE_API_KEY=your_key_here" > .env
 ```
 
-#### 2. **Query Expansion Takes Too Long**
+#### 2. **Connection Refused (Ollama)**
+- **Symptom**: `semantic_validation error: [Errno 61] Connection refused`
+- **Cause**: The `Ollama` service is not running or the model `llama-guard3:1b` is not pulled.
+- **Solution**: Run `ollama serve` and `ollama pull llama-guard3:1b`. The system will gracefully skip semantic validation if it cannot connect.
+
+#### 3. **Table Not Found**
+- **Symptom**: `Table 'default_collection' was not found`
+- **Cause**: You are trying to search or talk before saving any documents.
+- **Solution**: Run the `save` command first.
+
+#### 4. **Query Expansion Takes Too Long**
 
 **Cause**: Query expansion requires an additional LLM call per query.
 

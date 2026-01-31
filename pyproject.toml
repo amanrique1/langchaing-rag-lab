@@ -32,15 +32,16 @@ datasets = "^4.5.0"
 jupytext = "^1.18.1"
 scikit-learn = "^1.8.0"
 markitdown = {extras = ["docx", "pdf", "pptx", "xlsx"], version = "^0.1.4"}
-sentence-transformers = "^5.2.0" 
+sentence-transformers = "^5.2.0"
 nltk = "^3.9.2"
 yake = "^0.6.0"
 langchain-ollama = "^1.0.1"
-typer = "^0.21.1"
 lancedb = "^0.26.1"
 tantivy = "^0.25.1"
 pylance = "^1.0.2"
-mem0ai = "^1.0.2"
+langchain-huggingface = "^1.2.0"
+typer = "^0.21.1"
+langgraph = "^1.0.7"
 
 
 [tool.poetry.group.lab.dependencies]

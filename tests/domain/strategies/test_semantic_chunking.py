@@ -22,14 +22,6 @@ def test_chunk():
     assert len(chunks) > 0
 
 
-def test_default_embedding_model_initialization():
-    """Tests that the default embedding model is initialized when none is provided."""
-    with patch.dict('os.environ', {'EMBEDDING_MODEL': 'models/embedding-001'}):
-        with patch('src.domain.services.chunking.strategies.semantic_chunking.GoogleGenerativeAIEmbeddings') as mock_embeddings:
-            strategy = SemanticChunkingStrategy()
-            mock_embeddings.assert_called_once_with(model='models/embedding-001')
-
-
 def test_standard_deviation_threshold():
     """Tests the STANDARD_DEVIATION threshold type."""
     mock_embedding_model = MagicMock()
@@ -40,13 +32,13 @@ def test_standard_deviation_threshold():
         [0.8, 0.9, 1.0],
         [0.85, 0.95, 1.0],
     ]
-    
+
     strategy = SemanticChunkingStrategy(
         embedding_model=mock_embedding_model,
         threshold_mode=SemanticChunkingThresholdType.STANDARD_DEVIATION,
         threshold_value=1.0,
     )
-    
+
     document = Document(
         metadata={"source": "test.md"},
         content="First sentence. Second sentence. Third sentence. Fourth sentence.",

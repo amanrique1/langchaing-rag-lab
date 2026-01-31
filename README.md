@@ -15,8 +15,9 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
     *   **FileSystem**: Local JSON storage for development/testing
     *   **All stores support**: `collection_name` and `persist_directory` for flexible configuration
 *   **Modern CLI**: Easy-to-use subcommand-based interface (`save`, `talk`, `search`, `chat`, `clean`, `info`).
-*   **Conversational Memory**: Modern LangChain message-based conversation history with sliding window memory.
-*   **Session Management**: Multi-session support with persistent conversation context per user/session.
+*   **LangGraph Orchestration**: State-machine based workflow for granular control and flexible execution paths.
+*   **Three-Tier Use Case Strategy**: SearchUseCase (chunks only), TalkUseCase (Q&A), ChatUseCase (conversational).
+*   **Session Management**: Multi-session support with in-memory conversation history.
 *   **Google Gemini Integration**: Uses Google's embedding and language models.
 *   **RAG Evaluation**: Built-in evaluation suite using the Ragas library to measure performance.
 
@@ -32,7 +33,7 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 *   **Rich Metadata Extraction**: Automatically extracts headers, filenames, and section titles.
 
 ### 💬 Conversational Features
-*   **Message-Based History**: Uses LangChain's modern `ChatMessageHistory` with proper message types (HumanMessage, AIMessage).
+*   **LangGraph-Based Memory**: State machine approach to conversation management with in-memory history.
 *   **Sliding Window Memory**: Configurable conversation window (default: 5 exchanges) to maintain context without overwhelming the LLM.
 *   **Session Persistence**: Conversations cached by `(user_id, session_id)` for seamless multi-session support.
 *   **Interactive Commands**: Built-in `/history`, `/stats`, `/sessions`, `/help`, `/clear` commands for session management.
@@ -44,6 +45,7 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
 *   **Python 3.11+**: The primary programming language.
 *   **Poetry**: For dependency management and project packaging.
 *   **LangChain**: Framework for LLM orchestration.
+*   **LangGraph**: State machine framework for workflow orchestration.
 *   **LanceDB**: Default vector database with hybrid search (vector + BM25).
 *   **ChromaDB**: Alternative vector database for document chunks.
 *   **Google Gemini**: Used for Embeddings and Language Modeling.
@@ -59,7 +61,6 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
   - [Three-Layer Architecture](#three-layer-architecture)
   - [Layers](#layers)
   - [Storage Backend Architecture](#storage-backend-architecture)
-  - [Conversation Memory Architecture](#conversation-memory-architecture)
   - [Data Flow Overview](#data-flow-overview)
 - [Enhanced RAG Architecture Deep Dive](#enhanced-rag-architecture-deep-dive)
   - [Storage Backend Strategy](#storage-backend-strategy)
@@ -71,6 +72,12 @@ This project serves as a **conversational AI lab**, providing a flexible framewo
   - [Available Strategies](#available-strategies)
   - [Query Expansion Architecture](#query-expansion-architecture)
   - [Performance Considerations](#performance-considerations)
+- [LangGraph Orchestration & Use Case Strategy](#langgraph-orchestration--use-case-strategy)
+  - [Three-Tier Use Case Architecture](#three-tier-use-case-architecture)
+  - [Unified Pipeline with Flexible Endpoints](#unified-pipeline-with-flexible-endpoints)
+  - [Comparison of Use Cases](#comparison-of-use-cases)
+  - [Workflow Logic](#workflow-logic)
+  - [Benefits of Graph Architecture](#benefits-of-graph-architecture)
 - [Conversation Memory System](#conversation-memory-system)
   - [Memory Architecture](#memory-architecture)
   - [Session Management](#session-management)
@@ -126,6 +133,7 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 │  - Inject into services                 │
 │  - Coordinate service calls             │
 │  - Manage conversation sessions         │
+│  - Orchestrate LangGraph workflows      │
 └──────────────┬──────────────────────────┘
                │
 ┌──────────────▼──────────────────────────┐
@@ -137,8 +145,8 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
 
 **Benefits:**
 - **Entry Points** are thin adapters that only parse input and call use cases
-- **Use Cases** orchestrate dependencies and coordinate services (easy to add new entry points like API)
-- **Services** contain reusable business logic that can be shared across use cases
+- **Use Cases** orchestrate dependencies and coordinate LangGraph workflows
+- **Services** contain reusable business logic shared across graph nodes
 - **Session Management** lives at the container level for proper lifecycle control
 
 ### Layers
@@ -151,12 +159,16 @@ This project is built using a **Hexagonal Architecture** (also known as Ports an
     *   **Enums**: `StorageType`, `LengthBasedChunkingMode`, `SemanticChunkingThresholdType`, `QueryExpansionStrategy`.
 
 *   **Application Layer** (`src/application`): Orchestrates business logic via Use Cases and defines Port interfaces.
+    *   **LangGraph Components**:
+        *   `RAGState`: Shared state schema for all graph nodes
+        *   `RAGNodes`: Implementation of all pipeline nodes (validation, expansion, retrieval, fusion, reranking, generation)
+        *   `create_rag_graph()`: Factory for creating graphs with different execution modes
     *   **Use Cases**:
-        *   `ChatUseCase`: Orchestrates conversational workflow with modern LangChain message-based memory.
-        *   `TalkUseCase`: Manages the end-to-end "Chat with Data" pipeline and orchestrates security grounding.
-        *   `SearchUseCase`: Orchestrates complex retrieval and reranking for search queries.
-        *   `ChunkingUseCase`: Manages document decomposition strategies.
-        *   `StorageUseCase`: Coordinates persistence and retrieval operations.
+        *   `SearchUseCase`: Orchestrates retrieval pipeline (validation → expansion → retrieval → fusion → reranking)
+        *   `TalkUseCase`: Adds generation layer for one-shot Q&A (extends SearchUseCase with answer generation)
+        *   `ChatUseCase`: Adds conversation memory for multi-turn conversations (extends TalkUseCase with session state)
+        *   `ChunkingUseCase`: Manages document decomposition strategies
+        *   `StorageUseCase`: Coordinates persistence and retrieval operations
     *   **Ports (Interfaces)**: `ChunkStore`, `GuardrailModel`, `LanguageModel`, `EmbeddingModel`, `Reranker`, `Retriever`, `QueryExpander`, `DocumentLoader`, `ChunkingStrategy`.
 
 *   **Infrastructure Layer** (`src/infrastructure`): Concrete adapters for external services and technologies.
@@ -224,54 +236,6 @@ The system resolves storage backends based on a strict priority system defined i
 - Small datasets (<1000 chunks)
 - No database dependencies needed
 
-### Conversation Memory Architecture
-
-The chat system uses modern LangChain patterns for conversation management:
-
-```
-┌──────────────────────────────────────────────┐
-│         DependencyContainer                  │
-│  ┌────────────────────────────────────────┐  │
-│  │  Chat Session Cache                    │  │
-│  │  Key: (user_id, session_id)            │  │
-│  │  Value: ChatUseCase instance           │  │
-│  │  ┌──────────────────────────────────┐  │  │
-│  │  │ ChatUseCase                      │  │  │
-│  │  │  ├─ ConversationBufferWindowMemory│  │  │
-│  │  │  │   └─ ChatMessageHistory        │  │  │
-│  │  │  │       ├─ HumanMessage         │  │  │
-│  │  │  │       ├─ AIMessage            │  │  │
-│  │  │  │       └─ (k exchanges max)    │  │  │
-│  │  │  ├─ SearchUseCase                │  │  │
-│  │  │  ├─ LanguageModel                │  │  │
-│  │  │  └─ InputGuard                   │  │  │
-│  │  └──────────────────────────────────┘  │  │
-│  └────────────────────────────────────────┘  │
-└──────────────────────────────────────────────┘
-```
-
-**Key Components**:
-
-1. **ChatMessageHistory**: LangChain's modern message storage
-   - Stores messages as proper `HumanMessage` and `AIMessage` objects
-   - Type-safe message handling
-   - Supports message metadata and additional attributes
-
-2. **ConversationBufferWindowMemory**: Sliding window memory manager
-   - Keeps last `k` conversation exchanges (default: 5)
-   - Automatically manages message list size
-   - Provides dictionary-based memory variable access
-
-3. **Session Caching**: Container-level session management
-   - Sessions cached by `(user_id, session_id)` tuple
-   - Resumable conversations across CLI invocations
-   - Memory persists until explicitly cleared or container reset
-
-4. **Memory Introspection**: Real-time conversation state
-   - `get_conversation_history()`: Returns formatted message list
-   - `get_memory_stats()`: Provides session statistics
-   - `clear_memory()`: Clears conversation while preserving session
-
 ### Data Flow Overview
 
 #### Save Command Data Flow
@@ -326,86 +290,6 @@ The chat system uses modern LangChain patterns for conversation management:
 └────────────────────────────────────────────────────┘
 ```
 
-#### Enhanced Chat Command Data Flow
-```
-┌─────────────────┐
-│   User Query    │
-└────────┬────────┘
-         │
-         ▼
-┌──────────────────────────────────────┐
-│  DependencyContainer                 │
-│  Get/Create ChatUseCase for session  │
-│  Key: (user_id, session_id)          │
-└────────┬─────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────┐
-│         ChatUseCase                  │
-│  ┌────────────────────────────────┐  │
-│  │ Load Conversation History      │  │
-│  │ from ChatMessageHistory        │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │ Query Expansion (Optional)     │  │
-│  │ - HyDE/StepBack/Subqueries...  │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │   Retrieval Strategy           │  │
-│  │   (SearchUseCase)              │  │
-│  │   - EnsembleRetriever          │  │
-│  │   - SimpleRetriever            │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │  Reranking (Optional)          │  │
-│  │  - Encoder-Based (Default)     │  │
-│  │  - LLM-Based (--llm-rerank)    │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │  Build Context-Aware Prompt    │  │
-│  │  - Recent conversation history │  │
-│  │  - Retrieved RAG context       │  │
-│  │  - Current query               │  │
-│  │  - System instructions         │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │  Input Guard (Safety)          │  │
-│  │  - Regex Fast Rules            │  │
-│  │  - LlamaGuard Semantic         │  │
-│  │  - Grounding via Template      │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │  Language Model (Gemini)       │  │
-│  │  Generate Answer               │  │
-│  └────────┬───────────────────────┘  │
-│           │                           │
-│           ▼                           │
-│  ┌────────────────────────────────┐  │
-│  │  Save to Memory                │  │
-│  │  HumanMessage(query)           │  │
-│  │  AIMessage(response)           │  │
-│  └────────────────────────────────┘  │
-└──────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Return Response │
-│ Display to User │
-└─────────────────┘
-```
-
 ---
 
 ## Enhanced RAG Architecture Deep Dive
@@ -438,7 +322,7 @@ The system supports three storage backends with automatic selection:
 The `EnsembleRetriever` combines multiple search strategies using **Reciprocal Rank Fusion (RRF)**:
 
 **Algorithm**:
-```python
+```
 for each chunk_id in results:
     rrf_score = 0
     for each retriever:
@@ -454,7 +338,7 @@ Where:
 
 **Benefits**:
 - Combines evidence from multiple sources
-- Reduces impact of outliers from any single retriever
+- Reduces impact of outliers from any single retrieval method
 - No need to normalize scores across different retrieval methods
 
 ### Retriever Selection
@@ -630,100 +514,384 @@ Step-Back: "What are the physics principles behind the ideal gas law?"
 
 ---
 
+## LangGraph Orchestration & Use Case Strategy
+
+The project uses **LangGraph** to orchestrate the RAG pipeline as a state machine, providing a unified architecture that supports three different use cases with varying execution depths.
+
+### Three-Tier Use Case Architecture
+
+The system implements a **layered use case strategy** where all three use cases share the same underlying pipeline but terminate at different stages:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   Shared Pipeline Layers                 │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  Layer 1: Security Validation                            │
+│  ├─ Fast Validation (Regex)                              │
+│  └─ Semantic Validation (LlamaGuard)                     │
+│                                                          │
+│  Layer 2: Query Understanding                            │
+│  └─ Query Expansion (HyDE/StepBack/etc, Optional)        │
+│                                                          │
+│  Layer 3: Retrieval                                      │
+│  ├─ Content Search (Parallel)                            │
+│  ├─ Metadata Search (Parallel)                           │
+│  └─ RRF Fusion                                           │
+│                                                          │
+│  Layer 4: Reranking                                      │
+│  └─ Cross-Encoder or LLM Reranking                       │
+│                                                          │
+│  ┌────────────────────────────────────────────┐          │
+│  │ SearchUseCase ENDS HERE → Returns Chunks   │          │
+│  └────────────────────────────────────────────┘          │
+│                                                          │
+│  Layer 5: Answer Generation                              │
+│  └─ Language Model (Grounded Prompt)                     │
+│                                                          │
+│  ┌────────────────────────────────────────────┐          │
+│  │ TalkUseCase ENDS HERE → Returns Answer     │          │
+│  └────────────────────────────────────────────┘          │
+│                                                          │
+│  Layer 6: Conversation Memory                            │
+│  └─ Message History Management (Sliding Window)          │
+│                                                          │
+│  ┌────────────────────────────────────────────┐          │
+│  │ ChatUseCase ENDS HERE → Returns Answer     │          │
+│  │ + Maintains Conversation State             │          │
+│  └────────────────────────────────────────────┘          │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Unified Pipeline with Flexible Endpoints
+
+**Graph Factory Design**:
+
+The `create_rag_graph()` factory creates different execution paths based on mode:
+
+```
+┌─────────────────────────────────────────────────┐
+│          Graph Factory (create_rag_graph)       │
+├─────────────────────────────────────────────────┤
+│  Mode Parameter:                                │
+│  ├─ "search"  → Ends at reranking              │
+│  ├─ "qa"      → Ends at generation             │
+│  └─ "chat"    → Includes memory management     │
+└─────────────────────────────────────────────────┘
+```
+
+**Execution Paths**:
+
+```
+┌─────────────┐
+│   START     │
+└──────┬──────┘
+       │
+       ├──────────────────────┬──────────────────────┐
+       │                      │                      │
+       ▼                      ▼                      ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  SearchUseCase  │  │  TalkUseCase    │  │  ChatUseCase    │
+│  (Mode: search) │  │  (Mode: qa)     │  │  (Mode: chat)   │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+       │                      │                      │
+       ▼                      ▼                      ▼
+Fast Validation      Fast Validation      Fast Validation
+       │                      │                      │
+       ▼                      ▼                      ▼
+Semantic Validation  Semantic Validation  Semantic Validation
+       │                      │                      │
+       ▼                      ▼                      ▼
+Query Expansion      Query Expansion      Query Expansion
+       │                      │                      │
+       ▼                      ▼                      ▼
+Content + Metadata   Content + Metadata   Content + Metadata
+   (Parallel)           (Parallel)           (Parallel)
+       │                      │                      │
+       ▼                      ▼                      ▼
+   RRF Fusion           RRF Fusion           RRF Fusion
+       │                      │                      │
+       ▼                      ▼                      ▼
+   Reranking            Reranking            Reranking
+       │                      │                      │
+       ▼                      ▼                      ▼
+┌─────────────────┐           │                      │
+│  RETURN CHUNKS  │           ▼                      ▼
+└─────────────────┘      Generation            Generation
+                              │                      │
+                              ▼                      ▼
+                     ┌─────────────────┐            │
+                     │ RETURN ANSWER   │            ▼
+                     └─────────────────┘    Update Conversation
+                                                   Memory
+                                                      │
+                                                      ▼
+                                            ┌─────────────────┐
+                                            │ RETURN ANSWER   │
+                                            │ + Save Messages │
+                                            └─────────────────┘
+```
+
+### Comparison of Use Cases
+
+| Feature | SearchUseCase | TalkUseCase | ChatUseCase |
+|---------|---------------|-------------|-------------|
+| **Graph Mode** | `search` | `qa` | `chat` |
+| **Fast Validation** | ✅ Regex patterns | ✅ Regex patterns | ✅ Regex patterns |
+| **Semantic Validation** | ✅ LlamaGuard | ✅ LlamaGuard | ✅ LlamaGuard |
+| **Query Expansion** | ✅ Optional (HyDE/StepBack/etc) | ✅ Optional (HyDE/StepBack/etc) | ✅ Optional (HyDE/StepBack/etc) |
+| **Content Retrieval** | ✅ Vector + BM25 | ✅ Vector + BM25 | ✅ Vector + BM25 |
+| **Metadata Retrieval** | ✅ Optional (dual collection) | ✅ Optional (dual collection) | ✅ Optional (dual collection) |
+| **RRF Fusion** | ✅ Ensemble results | ✅ Ensemble results | ✅ Ensemble results |
+| **Reranking** | ✅ Encoder or LLM | ✅ Encoder or LLM | ✅ Encoder or LLM |
+| **Answer Generation** | ❌ No generation | ✅ Grounded prompts | ✅ Grounded prompts + history |
+| **Conversation Memory** | ❌ No memory | ❌ Stateless | ✅ Sliding window (k exchanges) |
+| **Session Management** | ❌ No sessions | ❌ No sessions | ✅ Cached by (user_id, session_id) |
+| **Returns** | `List[Chunk]` | `str` (answer) | `str` (answer) |
+| **State Persistence** | Stateless | Stateless | Stateful (in-memory) |
+| **Checkpointer** | ❌ Not applicable | ❌ Not applicable | ❌ Not used (in-memory only) |
+| **Use Case** | Search & retrieval | One-shot Q&A | Multi-turn conversations |
+| **CLI Command** | `cli search` | `cli talk` | `cli chat` |
+
+**Key Design Benefits**:
+1. **Code Reuse**: All three use cases share the same validation, retrieval, and reranking nodes
+2. **Consistency**: Same security guardrails and quality controls across all modes
+3. **Flexibility**: Easy to add new use cases by changing the graph endpoint
+4. **Maintainability**: Single source of truth for RAG pipeline logic
+5. **Testing**: Can test retrieval independently from generation
+
+### Workflow Logic
+
+The following diagram illustrates the detailed node-level flow of the RAG graph:
+
+```mermaid
+graph TD
+    Start((Start)) --> FastVal[Fast Validation]
+    FastVal -->|Safe| SemVal[Semantic Validation]
+    FastVal -->|Unsafe| End((End))
+
+    SemVal -->|Safe| Expand[Query Expansion]
+    SemVal -->|Unsafe| End
+
+    Expand --> FanOut{Parallel Fan-Out}
+
+    FanOut --> ContentSearch[Content Search]
+    FanOut --> MetaSearch[Metadata Search]
+
+    ContentSearch --> Fusion[RRF Fusion]
+    MetaSearch --> Fusion
+
+    Fusion --> Reranking[Reranking]
+
+    Reranking --> Decision{Mode?}
+
+    Decision -->|search| SearchEnd[Return Chunks]
+    Decision -->|qa/chat| Generation[Generation]
+
+    SearchEnd --> End
+    Generation --> MemCheck{Chat Mode?}
+
+    MemCheck -->|No| QAEnd[Return Answer]
+    MemCheck -->|Yes| Memory[Update Memory]
+
+    QAEnd --> End
+    Memory --> ChatEnd[Return Answer + Save Messages]
+    ChatEnd --> End
+
+    style FastVal fill:#ffcccc
+    style SemVal fill:#ffcccc
+    style Expand fill:#ffffcc
+    style ContentSearch fill:#ccffcc
+    style MetaSearch fill:#ccffcc
+    style Fusion fill:#ccffff
+    style Reranking fill:#ccccff
+    style Generation fill:#ffccff
+    style Memory fill:#ffccff
+    style SearchEnd fill:#cccccc
+    style QAEnd fill:#cccccc
+    style ChatEnd fill:#cccccc
+```
+
+**Node Responsibilities**:
+
+| Node | Purpose | State Updates |
+|------|---------|---------------|
+| **Fast Validation** | Regex-based pattern matching for common jailbreaks | `is_safe_fast`, `error` |
+| **Semantic Validation** | AI-powered intent detection using LlamaGuard | `is_safe_semantic`, `error` |
+| **Query Expansion** | Transform query using selected strategy (optional) | `expanded_queries` |
+| **Content Search** | Vector + BM25 search on content collection | `content_results` |
+| **Metadata Search** | Vector search on metadata collection (optional) | `metadata_results` |
+| **RRF Fusion** | Merge and rank results using Reciprocal Rank Fusion | `candidates` |
+| **Reranking** | Cross-encoder or LLM-based result refinement | `chunks` |
+| **Generation** | LLM answer generation with grounding | `answer`, `messages` (chat mode) |
+
+### Benefits of Graph Architecture
+
+1.  **Granular Control**: Each step (validation, expansion, search, fusion, reranking, generation) is a discrete node that can be independently updated, monitored, or replaced.
+
+2.  **Parallel Execution**: Content and metadata searches run concurrently in the graph, reducing overall latency without complex async coordination.
+
+3.  **Conditional Routing**: Graph edges allow the system to:
+    - Terminate early on security violations
+    - Skip metadata search for single-collection mode
+    - Route to different endpoints (chunks vs. answers vs. conversational answers)
+    - Apply different memory strategies based on use case
+
+4.  **Resilient Execution**: Node-level error handling allows graceful degradation (e.g., if semantic validation fails, fall back to fast validation).
+
+5.  **Observable Workflow**: State updates at each node provide visibility into the pipeline execution for debugging and monitoring.
+
+6.  **Flexible Composition**: New use cases can be created by composing existing nodes with different routing logic.
+
+7.  **Testability**: Individual nodes can be tested in isolation, and entire sub-graphs can be tested independently.
+
+**State Machine Advantages**:
+
+- **Explicit Flow**: The graph structure makes the execution path visible and auditable
+- **Reusable Nodes**: Same validation and retrieval logic across all use cases
+- **Easy Extensions**: Adding new capabilities (e.g., caching layer) means adding a new node
+- **Type Safety**: `RAGState` TypedDict ensures all nodes receive and return expected data structures
+
+---
+
 ## Conversation Memory System
 
-The chat system implements modern LangChain patterns for robust conversation management.
+The chat system implements a LangGraph-based approach to conversation management with in-memory state persistence.
 
 ### Memory Architecture
 
-**Component Hierarchy**:
+**Component Structure**:
 
 ```
-ChatUseCase
-  ├─ ConversationBufferWindowMemory (LangChain)
-  │    ├─ memory_key: "chat_history"
-  │    ├─ k: 5 (configurable window size)
-  │    ├─ return_messages: True
-  │    └─ chat_memory: ChatMessageHistory
-  │         ├─ messages: List[BaseMessage]
-  │         │    ├─ HumanMessage(content="...")
-  │         │    ├─ AIMessage(content="...")
-  │         │    └─ (repeating pattern)
-  │         └─ Methods:
-  │              ├─ add_message()
-  │              ├─ clear()
-  │              └─ messages property
-  ├─ SearchUseCase (RAG retrieval)
-  ├─ LanguageModel (Answer generation)
-  └─ InputGuard (Security validation)
+DependencyContainer
+  └─ Chat Session Cache
+      └─ Key: (user_id, session_id, config, reranking, expansion)
+          └─ ChatUseCase Instance
+              ├─ RAGNodes (shared pipeline)
+              ├─ LangGraph (compiled graph)
+              ├─ In-Memory Message List
+              │   ├─ HumanMessage(content="...")
+              │   ├─ AIMessage(content="...")
+              │   └─ (managed by execute() method)
+              └─ Memory Window (k exchanges)
 ```
 
 **Key Features**:
 
-1. **Message Types**: Proper `HumanMessage` and `AIMessage` objects
-   - Type-safe message handling
-   - Metadata support for future extensions
-   - Compatible with LangChain ecosystem
+1. **In-Memory History**: Python list maintains conversation messages
+   - Lightweight and fast
+   - No external dependencies
+   - Suitable for single-process applications
 
 2. **Sliding Window**: Automatic context management
    - Keeps last `k` exchanges (default: 5)
    - Prevents context overflow
    - Maintains recent relevant history
 
-3. **Memory Variables**: Dictionary-based access
-   ```python
-   memory.load_memory_variables({})
-   # Returns: {"chat_history": [HumanMessage(...), AIMessage(...), ...]}
-   ```
+3. **State Management**: Graph invocation pattern
+   - Previous messages passed in `initial_state["messages"]`
+   - New messages extracted from graph result
+   - History updated after each query
 
-4. **Context Building**: Structured prompt assembly
-   - System instructions
-   - Conversation history
-   - Retrieved RAG context
-   - Current query
-   - Grounding instructions
+4. **Session Isolation**: Container-level caching
+   - Each session has independent state
+   - Sessions identified by composite key
+   - Multiple concurrent sessions supported
 
 ### Session Management
 
-**Container-Level Caching**:
-
-```python
-# DependencyContainer maintains session cache
-_chat_sessions: Dict[Tuple[str, str], ChatUseCase] = {}
-
-# Session key structure
-session_key = (user_id, session_id)
-
-# Benefits:
-# - Conversations persist across CLI calls
-# - Memory survives individual command executions
-# - Multiple concurrent sessions supported
-# - Explicit session cleanup available
-```
-
 **Session Lifecycle**:
 
-1. **Creation**: First call to `get_chat_use_case()`
-   - Creates new `ChatUseCase` instance
-   - Initializes empty `ChatMessageHistory`
-   - Caches in container by session key
-
-2. **Resumption**: Subsequent calls with same identifiers
-   - Returns existing `ChatUseCase` instance
-   - Conversation history intact
-   - Memory window automatically maintained
-
-3. **Termination**: Explicit cleanup
-   - `/clear` command: Clears history, keeps session
-   - `/exit` command: Ends interactive mode, session cached
-   - `clear_chat_session()`: Removes from container
+```
+┌─────────────────────────────────────────────┐
+│          Session Creation Flow              │
+├─────────────────────────────────────────────┤
+│                                             │
+│  1. User calls get_chat_use_case()          │
+│     ├─ Provides: user_id, session_id       │
+│     └─ Specifies: config, memory_k          │
+│                                             │
+│  2. Container checks cache                  │
+│     ├─ Key: (user_id, session_id, ...)     │
+│     └─ If exists → return cached instance   │
+│                                             │
+│  3. If not cached → create new              │
+│     ├─ Initialize empty message list        │
+│     ├─ Build LangGraph with shared nodes    │
+│     └─ Cache instance for future calls      │
+│                                             │
+│  4. Query execution                         │
+│     ├─ Load existing messages               │
+│     ├─ Pass to graph in initial_state       │
+│     ├─ Extract new messages from result     │
+│     └─ Update in-memory history             │
+│                                             │
+│  5. Session termination                     │
+│     ├─ /clear → clears history, keeps session │
+│     ├─ /exit → ends CLI, session cached    │
+│     └─ clear_chat_session() → removes cache │
+│                                             │
+└─────────────────────────────────────────────┘
+```
 
 **Session Identification**:
 
-| Identifier | Default | Purpose |
-|-----------|---------|---------|
-| `user_id` | `"default_user"` | User identity/tracking |
+| Component | Default Value | Purpose |
+|-----------|--------------|---------|
+| `user_id` | `"default_user"` | User identity for tracking |
 | `session_id` | Auto-generated UUID | Conversation grouping |
+| `config` | Storage configuration | Retrieval backend settings |
+| `use_llm_reranking` | Boolean | Reranking strategy |
+| `expansion_strategy` | Optional string | Query expansion mode |
+
+**Cache Key Structure**:
+```
+session_key = (user_id, session_id, config, use_llm_reranking, expansion_strategy)
+```
+
+This composite key allows:
+- Multiple sessions per user
+- Different configurations per session
+- Isolated conversation contexts
+
+### Memory Window Strategy
+
+**Sliding Window Mechanism**:
+
+```
+┌─────────────────────────────────────────────────────┐
+│        Sliding Window (k=5 exchanges)               │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Exchange 1: [HumanMessage, AIMessage]             │
+│  Exchange 2: [HumanMessage, AIMessage]             │
+│  Exchange 3: [HumanMessage, AIMessage] ← Window    │
+│  Exchange 4: [HumanMessage, AIMessage] ← Window    │
+│  Exchange 5: [HumanMessage, AIMessage] ← Window    │
+│  Exchange 6: [HumanMessage, AIMessage] ← Window    │
+│  Exchange 7: [HumanMessage, AIMessage] ← Window    │
+│                                                     │
+│  Oldest exchanges (1-2) are not included in        │
+│  prompt context but remain in full history         │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Benefits**:
+- **Controlled Context Size**: Prevents overwhelming the LLM with too much history
+- **Recency Bias**: Most recent exchanges are more relevant to current query
+- **Configurable**: Adjust `memory_k` based on use case (longer for deep discussions)
+- **Performance**: Reduces token usage and inference time
+
+**Memory Statistics**:
+
+Available via `get_memory_stats()`:
+- `user_id`: Session owner
+- `session_id`: Conversation identifier
+- `total_messages`: Complete message count (Human + AI)
+- `exchanges`: Number of conversation turns (pairs of messages)
+- `memory_window_k`: Configured window size
 
 ---
 
@@ -740,36 +908,78 @@ This project implements a multi-layer security approach to ensure that the LLM p
           │
           ▼
 ┌───────────────────────────────────┐
-│   Layer 1: Fast Rules (Regex)     │  <-- Blocks common jailbreaks
-│   Check: GuardrailConfig.PATTERNS │
+│   Layer 1: Fast Rules (Regex)     │  ← Blocks common jailbreaks
+│   Check: GuardrailConfig.PATTERNS │     (SQL injection, XSS, etc.)
+│   Node: fast_validation           │
 └─────────┬─────────────────────────┘
           │ (Pass)
           ▼
 ┌───────────────────────────────────┐
-│   Layer 2: Semantic (LlamaGuard)  │  <-- AI-powered intent detection
-│   Check: LlamaGuard.validate()    │
+│   Layer 2: Semantic (LlamaGuard)  │  ← AI-powered intent detection
+│   Check: LlamaGuard.validate()    │     (malicious intent, safety)
+│   Node: semantic_validation       │
 └─────────┬─────────────────────────┘
           │ (Pass)
           ▼
 ┌───────────────────────────────────┐
-│   Layer 3: Strict Grounding       │  <-- Prompt instructions
-│   Template: assets/templates/query_template │
+│   Layer 3: RAG Pipeline           │  ← Controlled retrieval
+│   Nodes: expansion → search →     │     (only documented sources)
+│          fusion → reranking       │
 └─────────┬─────────────────────────┘
-          │ (Enforce Safe Prompt)
+          │ (Retrieved Context)
           ▼
 ┌───────────────────────────────────┐
-│     Language Model Execution      │
+│   Layer 4: Strict Grounding       │  ← Prompt instructions
+│   Template: query_template.txt    │     (answer only from context)
+│   Node: generation                │
+└─────────┬─────────────────────────┘
+          │ (Grounded Answer)
+          ▼
+┌───────────────────────────────────┐
+│     Safe Response to User         │
 └───────────────────────────────────┘
 ```
 
+**Layer Responsibilities**:
+
+| Layer | Technology | Purpose | Failure Mode |
+|-------|-----------|---------|--------------|
+| **Fast Validation** | Regex patterns | Block obvious attacks | Terminate with security message |
+| **Semantic Validation** | LlamaGuard | Detect malicious intent | Terminate with security message |
+| **RAG Pipeline** | Vector search | Limit to documented knowledge | Return only relevant chunks |
+| **Strict Grounding** | Prompt template | Prevent hallucinations | Answer only from provided context |
+
 ### Prompt Grounding Strategy
 
-The `InputGuard` uses a strict system prompt (`assets/templates/query_template.txt`) that forces the model to stay "grounded" in the provided context. Key rules include:
-- **No Hallucinations**: Do not use outside knowledge.
-- **Strict Evidence**: Only answer if the answer is explicitly in the context.
-- **Safety**: Refuse to answer harmful or out-of-scope questions.
-- **Conversation Awareness**: Consider chat history while staying grounded in documentation.
+The `generation` node uses a strict system prompt (`assets/templates/query_template.txt`) that enforces:
+
+1. **No Hallucinations**: "Do not use outside knowledge or make assumptions"
+2. **Evidence-Based**: "Only answer if the information is explicitly in the provided context"
+3. **Safety First**: "Refuse to answer harmful, inappropriate, or out-of-scope questions"
+4. **Context Awareness**: "Consider the conversation history while staying grounded in documentation"
+5. **Honest Limitations**: "If you don't know or can't find it in the context, say so clearly"
+
+**Grounding Template Structure**:
+```
+System Instructions:
+  ├─ Role definition (helpful documentation assistant)
+  ├─ Core constraints (no hallucinations, evidence-based)
+  ├─ Safety guidelines (refuse harmful requests)
+  └─ Response format (clear, concise, sourced)
+
+Conversation History:
+  └─ Last k exchanges (sliding window)
+
+Retrieved Context:
+  └─ Top chunks from RAG pipeline
+
+Current Query:
+  └─ User's latest question
+
+Output:
+  └─ Grounded answer or refusal
+```
 
 ---
 
-**🚀 Ready to start?** Head over to [USAGE.md](USAGE.md) for installation instructions and examples!
+**🚀 Ready to start?** Head over to [USAGE.md](USAGE.md) for installation instructions, CLI examples, and technical details!

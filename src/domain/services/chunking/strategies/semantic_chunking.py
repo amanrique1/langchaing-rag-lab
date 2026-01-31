@@ -1,7 +1,8 @@
 import os
 import re
 import numpy as np
-from typing import List, Any, Optional
+from typing import List, Optional
+from src.application.ports.embedding_model import EmbeddingModel
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 from src.domain.models.chunk import Chunk
@@ -18,7 +19,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
 
     def __init__(
         self,
-        embedding_model: Any = None,
+        embedding_model: EmbeddingModel,
         threshold_mode: SemanticChunkingThresholdType = SemanticChunkingThresholdType.PERCENTILE,
         threshold_value: float = 95.0,
         min_sentences: int = 1,
@@ -28,8 +29,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         Initialize the Semantic Chunking Strategy.
 
         Args:
-            embedding_model (Any, optional): The embedding model instance. If None, tries to
-                load `GoogleGenerativeAIEmbeddings` using the `EMBEDDING_MODEL` env var.
+            embedding_model (EmbeddingModel): The embedding model instance.
             threshold_mode (SemanticChunkingThresholdType): Logic for calculating the split threshold.
                 Defaults to `PERCENTILE`.
             threshold_value (float): The value for the threshold calculation.
@@ -39,12 +39,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
                 Defaults to None (unlimited).
         """
 
-        if embedding_model is None:
-            model_name = os.getenv("EMBEDDING_MODEL", "models/embedding-001")
-            self.embedding_model = GoogleGenerativeAIEmbeddings(model=model_name)
-        else:
-            self.embedding_model = embedding_model
-
+        self.embedding_model = embedding_model
         self.threshold_mode = threshold_mode
         self.threshold_value = threshold_value
         self.min_sentences = min_sentences

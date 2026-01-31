@@ -70,7 +70,7 @@ class Retriever(ABC):
         )
 
         try:
-            expanded = self.query_expander.generate(query)
+            expanded = self.query_expander.expand(query)
 
             if isinstance(expanded, list):
                 total_queries = 1 + len(expanded)

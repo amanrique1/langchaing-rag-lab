@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Union, List
+from typing import List
 
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 from langchain_core.output_parsers import NumberedListOutputParser
@@ -11,7 +11,6 @@ from src.application.ports.language_model import LanguageModel
 from src.domain.models.enums import QueryExpansionStrategy
 
 logger = logging.getLogger(__name__)
-
 
 class QueryExpander:
     """
@@ -62,115 +61,103 @@ class QueryExpander:
             ValueError: If template file doesn't exist or can't be read.
         """
         if not self._template:
-            # Determine template filename
-            is_multi_query = self.strategy in (QueryExpansionStrategy.ZERO_SHOT, QueryExpansionStrategy.FEW_SHOT)
+            is_multi_query = self.strategy in (
+                QueryExpansionStrategy.ZERO_SHOT,
+                QueryExpansionStrategy.FEW_SHOT
+            )
             template_filename = "multi_query.txt" if is_multi_query else f"{self.strategy.value}.txt"
             template_path = self.TEMPLATE_BASE_PATH / template_filename
 
-            # Validate and load template
             if not template_path.exists():
-                raise ValueError(
-                    f"Template file not found: {template_path}\n"
-                    f"Strategy: {self.strategy.value}"
-                )
+                raise ValueError(f"Template file not found: {template_path}")
 
-            try:
-                self._template = template_path.read_text(encoding='utf-8')
-                logger.debug(
-                    f"Template loaded: {template_path.name} "
-                    f"({len(self._template)} chars, strategy: {self.strategy.value})"
-                )
-            except Exception as e:
-                raise ValueError(f"Failed to read template file {template_path}: {e}")
+            self._template = template_path.read_text(encoding='utf-8')
+            logger.debug(f"Template loaded: {template_path.name}")
 
         return self._template
 
-    def generate(self, question: str) -> Union[str, List[str]]:
+    def expand(self, question: str) -> List[str]:
         """
-        Generates an augmented query for the given question using the specified strategy.
+        Expands a query into multiple variations.
 
         Args:
-            question (str): The question to generate an augmented query for.
+            question: The original query to expand
 
         Returns:
-            Union[str, List[str]]:
-                - str for single-output strategies (HYDE, STEPBACK)
-                - List[str] for multi-output strategies (SUBQUERIES, ZERO_SHOT, FEW_SHOT)
-
-        Raises:
-            ValueError: If few-shot examples can't be loaded or are invalid.
+            List[str]: Expanded query variations (always includes original)
         """
-        # Input validation
         if not question or not question.strip():
-            logger.warning("Empty question received for query expansion")
+            logger.warning("Empty question received")
+            return [question]
 
-        logger.debug(f"Generating queries with {self.strategy.value} strategy")
+        logger.debug(f"Expanding query with {self.strategy.value} strategy")
         start_time = time.time()
 
-        # Build prompt based on strategy
-        if self.strategy == QueryExpansionStrategy.FEW_SHOT:
-            # Load few-shot examples
-            examples_path = self.TEMPLATE_BASE_PATH / "few_shot_examples.json"
-
-            if not examples_path.exists():
-                raise ValueError(f"Few-shot examples file not found: {examples_path}")
-
-            try:
-                examples = json.loads(examples_path.read_text(encoding='utf-8'))
-                logger.debug(f"Loaded {len(examples)} few-shot examples")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in {examples_path}: {e}")
-            except Exception as e:
-                raise ValueError(f"Failed to read {examples_path}: {e}")
-
-            # Build few-shot prompt
-            example_prompt = ChatPromptTemplate.from_messages([
-                ("human", "{question}"),
-                ("ai", "{answer}"),
-            ])
-
-            few_shot_prompt = FewShotChatMessagePromptTemplate(
-                example_prompt=example_prompt,
-                examples=examples,
-            )
-
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", self.template),
-                few_shot_prompt,
-                ("human", "{question}"),
-            ])
-        else:
-            # Standard prompt (HYDE, STEPBACK, SUBQUERIES, ZERO_SHOT)
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", self.template),
-                ("human", "{question}"),
-            ])
-
-        # Determine parser
-        parser = NumberedListOutputParser() if self.strategy in self.LIST_BASED_STRATEGIES else None
-
-        # Format prompt and generate answer
         try:
+            # Build prompt based on strategy
+            if self.strategy == QueryExpansionStrategy.FEW_SHOT:
+                prompt = self._build_few_shot_prompt()
+            else:
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", self.template),
+                    ("human", "{question}"),
+                ])
+
+            # Determine parser
+            parser = (NumberedListOutputParser()
+                     if self.strategy in self.LIST_BASED_STRATEGIES
+                     else None)
+
+            # Generate
             formatted_prompt = prompt.format(question=question)
-
-            llm_start_time = time.time()
             result = self.llm.get_answer(formatted_prompt, parser=parser)
-            llm_duration = time.time() - llm_start_time
 
-            total_duration = time.time() - start_time
+            # Normalize to list
+            if isinstance(result, str):
+                expanded = [result]
+            else:
+                expanded = result
 
-            # Log internal metrics
-            result_count = len(result) if isinstance(result, list) else 1
-            logger.debug(
-                f"Query generation complete: {result_count} variant(s) in {total_duration:.2f}s "
-                f"(LLM: {llm_duration:.2f}s, strategy: {self.strategy.value})"
+            # Clean and validate
+            expanded = [q.strip() for q in expanded if q and q.strip()]
+
+            if not expanded:
+                logger.warning("Expansion produced no results, using original")
+                return [question]
+
+            duration = time.time() - start_time
+            logger.info(
+                f"Query expanded: {len(expanded)} variant(s) in {duration:.2f}s "
+                f"(strategy: {self.strategy.value})"
             )
 
-            return result
+            return expanded
 
         except Exception as e:
-            logger.error(
-                f"Query generation failed (strategy: {self.strategy.value}): {e}",
-                exc_info=True
-            )
-            raise
+            logger.error(f"Query expansion failed: {e}", exc_info=True)
+            return [question]  # Fallback to original
+
+    def _build_few_shot_prompt(self) -> ChatPromptTemplate:
+        """Build few-shot prompt with examples."""
+        examples_path = self.TEMPLATE_BASE_PATH / "few_shot_examples.json"
+
+        if not examples_path.exists():
+            raise ValueError(f"Few-shot examples not found: {examples_path}")
+
+        examples = json.loads(examples_path.read_text(encoding='utf-8'))
+
+        example_prompt = ChatPromptTemplate.from_messages([
+            ("human", "{question}"),
+            ("ai", "{answer}"),
+        ])
+
+        few_shot_prompt = FewShotChatMessagePromptTemplate(
+            example_prompt=example_prompt,
+            examples=examples,
+        )
+
+        return ChatPromptTemplate.from_messages([
+            ("system", self.template),
+            few_shot_prompt,
+            ("human", "{question}"),
+        ])
