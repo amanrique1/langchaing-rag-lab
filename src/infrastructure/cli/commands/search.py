@@ -46,23 +46,22 @@ def search(
     container = get_container()
     use_reranking = not no_rerank
 
-    try:
-        search_use_case = container.get_search_use_case(storage_config, llm_reranking, expand)
+    search_use_case = container.get_search_use_case(storage_config, llm_reranking, expand)
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            progress.add_task("Searching...", total=None)
-            chunks = search_use_case.execute(query, top_k, candidates, use_reranking)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        progress.add_task("Searching...", total=None)
+        result = search_use_case.execute(query, top_k, candidates, use_reranking)
 
-        _display_chunks(chunks, query)
-
-    except Exception as e:
-        logger.error(f"Search failed: {e}", exc_info=verbose)
-        console.print(f"[red]Error:[/red] {e}")
+    if result.is_failure:
+        logger.error(f"Search failed: {result.error}", exc_info=verbose)
+        console.print(f"[red]Error:[/red] {result.error}")
         raise typer.Exit(code=EXIT_CODE_ERROR)
+
+    _display_chunks(result.value, query)
 
 
 def _display_chunks(chunks: List[Any], query: str) -> None:

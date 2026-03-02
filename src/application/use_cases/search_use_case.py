@@ -7,6 +7,7 @@ from src.application.ports.chunk_store import ChunkStore
 from src.application.ports.reranker import Reranker
 from src.domain.guardrails.input_guard import InputGuard
 from src.domain.models.chunk import Chunk
+from src.domain.result import Result
 from src.infrastructure.adapters.models.llama_guard_model import LlamaGuard
 
 
@@ -71,7 +72,7 @@ class SearchUseCase:
         num_candidates: int = 20,
         use_reranking: bool = True,
         dual_collection: bool = True
-    ) -> List[Chunk]:
+    ) -> Result[List[Chunk], str]:
         """
         Execute search pipeline through LangGraph.
 
@@ -91,7 +92,7 @@ class SearchUseCase:
             dual_collection: Whether to use both content and metadata search
 
         Returns:
-            List of most relevant chunks (ordered by relevance)
+            Result with List of most relevant chunks (ordered by relevance) or error string
         """
         try:
             # Prepare initial state
@@ -121,20 +122,22 @@ class SearchUseCase:
             result = self.graph.invoke(initial_state)
 
             # Extract chunks from result
-            chunks = result.get("chunks", [])
+            chunks = result.get("chunks") or []
 
             # Handle security blocks
             if result.get("error") and not result.get("is_safe_fast", True):
-                logger.warning(f"Query blocked by fast validation: {result.get('error')}")
-                return []
+                error_msg = f"Query blocked by fast validation: {result.get('error')}"
+                logger.warning(error_msg)
+                return Result.fail(error_msg)
 
             if result.get("error") and not result.get("is_safe_semantic", True):
-                logger.warning(f"Query blocked by semantic validation: {result.get('error')}")
-                return []
+                error_msg = f"Query blocked by semantic validation: {result.get('error')}"
+                logger.warning(error_msg)
+                return Result.fail(error_msg)
 
             logger.info(f"Search completed, found {len(chunks)} chunks")
-            return chunks
+            return Result.ok(chunks)
 
         except Exception as e:
             logger.error(f"Error in SearchUseCase: {e}", exc_info=True)
-            return []
+            return Result.fail(str(e))
